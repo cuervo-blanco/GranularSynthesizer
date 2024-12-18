@@ -1,0 +1,14 @@
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/deps/libclang_sys-a271fa3aa518ce12.rmeta: /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/lib.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/support.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/link.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/macros.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/common.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/dynamic.rs
+
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/deps/libclang_sys-a271fa3aa518ce12.rlib: /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/lib.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/support.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/link.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/macros.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/common.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/dynamic.rs
+
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/deps/clang_sys-a271fa3aa518ce12.d: /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/lib.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/support.rs /Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/link.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/macros.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/common.rs /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/dynamic.rs
+
+/Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/lib.rs:
+/Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/support.rs:
+/Users/astro/.cargo/registry/src/index.crates.io-6f17d22bba15001f/clang-sys-1.8.1/src/link.rs:
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/macros.rs:
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/common.rs:
+/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out/dynamic.rs:
+
+# env-dep:OUT_DIR=/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/debug/build/clang-sys-11c4a0f0d09835fb/out
