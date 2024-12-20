@@ -70,8 +70,9 @@ include CMakeFiles/QtRustSynth.dir/progress.make
 include CMakeFiles/QtRustSynth.dir/flags.make
 
 QtRustSynth_autogen/timestamp: /Users/astro/Qt/6.8.1/macos/libexec/moc
+QtRustSynth_autogen/timestamp: /Users/astro/Qt/6.8.1/macos/libexec/uic
 QtRustSynth_autogen/timestamp: CMakeFiles/QtRustSynth.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC for target QtRustSynth"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Automatic MOC and UIC for target QtRustSynth"
 	/usr/local/bin/cmake -E cmake_autogen /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/CMakeFiles/QtRustSynth_autogen.dir/AutogenInfo.json ""
 	/usr/local/bin/cmake -E touch /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/QtRustSynth_autogen/timestamp
 
@@ -133,8 +134,8 @@ QtRustSynth: CMakeFiles/QtRustSynth.dir/QtRustSynth_autogen/mocs_compilation.cpp
 QtRustSynth: CMakeFiles/QtRustSynth.dir/main.cpp.o
 QtRustSynth: CMakeFiles/QtRustSynth.dir/SynthUI.cpp.o
 QtRustSynth: CMakeFiles/QtRustSynth.dir/build.make
+QtRustSynth: /Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/release/libbackend.dylib
 QtRustSynth: /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/QtWidgets
-QtRustSynth: /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/../backend/target/release/libbackend.dylib
 QtRustSynth: /Users/astro/Qt/6.8.1/macos/lib/QtGui.framework/Versions/A/QtGui
 QtRustSynth: /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Versions/A/QtCore
 QtRustSynth: CMakeFiles/QtRustSynth.dir/link.txt
