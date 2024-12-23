@@ -8,14 +8,18 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
-add_executable(QtRustSynth main.cpp SynthUI.cpp)
+find_library(RUST_LIB NAMES libbackend.dylib PATHS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../backend/target/release
+    REQUIRED) 
+if(NOT RUST_LIB)
+    message(FATAL_ERROR "Rust library not found!")
+endif()
+
+add_executable(QtRustSynth main.cpp SynthUI.h SynthUI.cpp)
+target_link_libraries(QtRustSynth PRIVATE ${RUST_LIB})
 
 target_include_directories(QtRustSynth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(QtRustSynth PRIVATE Qt6::Widgets)
-
-target_link_libraries(
-    QtRustSynth PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../backend/target/release/libbackend.dylib) 
-
-

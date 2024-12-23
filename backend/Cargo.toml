@@ -8,6 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 cpal = "0.15.3"
+crossbeam-channel = "0.5.14"
 dasp = "0.11.0"
 dasp_signal = "0.11.0"
 hound = "3.5.1"

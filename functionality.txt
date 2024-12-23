@@ -1,0 +1,32 @@
+Functionality of the granular synth by Andy Farnell.
+
+[X] 1. Loads a file and stores it in an array (buffer) called source-array.
+[X] 2. Calculates de size and store it in a variable: filesize
+[X] 3. Generates a grain-envelope and stores in grain-env array
+[X] 4. Grain Start from 0.0 - 1.0 multiplies by filesize and store in 
+grainstart
+[X?] 5. Grain Duration from 1.0 - 2000.0 (perhaps more) stores in graindur
+[X] 6. Grain Pitch from 0.1 - 2.0 multiplies by sample_rate and stores in
+grainpitch
+[X] 7. Overlap from 1.0 - 2.0 stores in overlap
+[X] 8. (graindur / 2) / overlap = metro_time_in_ms
+[] 9. Metro is updated every metro_time_in_ms and increases 
+a counter that is mod (%) by 4.
+* [] 10. Counter (0-3) triggers two random numbers: rA. 10000 & 
+rB. 200. Then  rB = rB / 10000 + 1. 
+* [] 11. Counter is used to route rA & rB to four different 
+grainvoice abstractions (covered below). In other words,
+every increase of the counter the random numbers are calculated
+and fed to a grainvoice (depending on the Counter number).
+[] 12. (rA, rB, 1) = (mystart, mypitch, mydur)
+
+Inside grainvoice:
+
+[X] 13. mydur * graindur = duration
+[] 14. vline (ramp) from 1 -> 0 in duration ms = ramp
+[] 15. ((((ramp * grainpitch) * mypitch ) * (duration / 1000)) + grainstart ) +
+mystart = index (used to read the source-array using tabread4~)
+[] 16. (ramp * 2048) = index of grain-env
+[] 17. The output of the tabread4~(source-array) multiplies with
+tabread4~(grain-env) and that is output of the grainvoice, which is audio
+output.

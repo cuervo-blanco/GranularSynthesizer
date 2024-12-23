@@ -17,9 +17,11 @@ extern "C" {
 
 class SynthUI : public QWidget {
     Q_OBJECT
+    Q_DISABLE_COPY(SynthUI)
 
 public:
-    SynthUI(QWidget *parent = nullptr);
+    explicit SynthUI(QWidget *parent = nullptr);
+    ~SynthUI();
 
 private slots:
     void onLoadFileClicked();
@@ -27,7 +29,7 @@ private slots:
     void onGrainDurationChanged(int value);
     void onGrainPitchChanged(int value);
     void onOverlapChanged(int value);
-    void onPlayAudioClicked(int value);
+    void onPlayAudioClicked();
 
 private:
     QLabel *waveformLabel;
@@ -36,7 +38,7 @@ private:
 
     QLabel *grainEnvelopeLabel;
     QGraphicsView *grainEnvelopeView;
-    QGraphicsScene grainEnvelopeScene;
+    QGraphicsScene *grainEnvelopeScene;
     
     QPushButton *loadFileButton;
     QPushButton *playButton;
@@ -49,12 +51,12 @@ private:
     QLabel *grainStartLabel;
     QLabel *grainDurationLabel;
     QLabel *grainPitchLabel;
-    QSlider *overlapLabel;
+    QLabel *overlapLabel;
 
     QString loadedFilePath;
 
-    void updateWaveformDisplay;
-    void updateEnvelopeDisplay;
+    void updateWaveformDisplay();
+    void updateEnvelopeDisplay();
 };
 
 #endif // SYNTHUI_H

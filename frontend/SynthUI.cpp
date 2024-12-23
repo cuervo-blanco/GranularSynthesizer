@@ -48,7 +48,8 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     grainPitchLabel = new QLabel("Grain Pitch", this);
     grainPitchSlider = new QSlider(Qt::Horizontal, this);
-    grainPitchSlider->setRange(0.1, 2);
+    grainPitchSlider->setRange(1, 20);
+    grainPitchSlider->setValue(10);
     connect(grainPitchSlider, &QSlider::valueChanged, this, &SynthUI::onGrainPitchChanged);
 
     sliderLayout->addWidget(grainPitchLabel);
@@ -64,16 +65,26 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     mainLayout->addLayout(sliderLayout);
 
-    playButton = QPushButton("PlayAudio", this);
+    playButton = new QPushButton("PlayAudio", this);
     connect(playButton, &QPushButton::clicked, this, &SynthUI::onPlayAudioClicked);
     mainLayout->addWidget(playButton);
+
+
 
     setLayout(mainLayout);
     setWindowTitle("Granular Synthesizer");
     
 }
 
-void onLoadFileClicked() {
+SynthUI::~SynthUI() {
+    delete grainEnvelopeScene;
+    delete grainEnvelopeView;
+    delete grainPitchSlider;
+    delete overlapLabel;
+    delete playButton;
+}
+
+void SynthUI::onLoadFileClicked() {
     loadedFilePath = QFileDialog::getOpenFileName(this, "Open Audio File", "", "WAV Files (*.wav)");
     if (!loadedFilePath.isEmpty()) {
         load_audio_from_file(loadedFilePath.toStdString().c_str());
