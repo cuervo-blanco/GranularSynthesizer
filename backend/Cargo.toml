@@ -1,7 +1,12 @@
 [package]
 name = "backend"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+authors = ["Cuervo Blanco"]
+descripton = "DSP backend for a Granular Synth"
+license = "MIT" 
+repository = "n/a" 
+documentaion = "n/a" 
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
