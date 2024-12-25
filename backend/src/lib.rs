@@ -731,6 +731,172 @@ mod tests {
         let max_val = out.iter().cloned().fold(f32::MIN, f32::max);
         assert!(max_val > 0.0);
     }
+    #[test]
+    fn test_grain_params_edge_cases() {
+        let synth = GranularSynth::new();
 
+        synth.set_params(999_999, 0, 0.0, 0.0);
+
+        let params = synth.params.lock().unwrap();
+        assert_eq!(params.grain_overlap, 1.0, "Overlap must clamp to 1.0");
+        assert_eq!(
+            params.grain_pitch,
+            params.specs.sample_rate as f32 * 0.1,
+            "Pitch must clamp to 0.1 * sample_rate" 
+        );
+        assert_eq!(params.grain_duration, 0);
+        drop(params);
+
+        synth.set_params(0, 44100, 9.0, 999.0);
+        let params2 = synth.params.lock().unwrap();
+        assert_eq!(params2.grain_overlap, 2.0, "Overlap must clamp to 2.0");
+        assert_eq!(
+            params2.grain_pitch,
+            params2.specs.sample_rate as f32 * 2.0,
+            "Pitch must clamp to 2.0 * sample_rate"
+        );
+    }
+
+    #[test]
+    fn test_empty_source_array() {
+        let synth = GranularSynth::new();
+        {
+            let mut buf = synth.source_array.lock().unwrap();
+            buf.clear();
+        }
+
+        let voice = GrainVoice::new(0.0, 1.0, 1.0);
+        let env = synth.get_grain_envelope();
+        let params = synth.params.lock().unwrap();
+        let out = voice.process_grain(&[], &env, &params);
+
+        assert_eq!(out.len(), 4410);
+        assert!(out.iter().all(|&sample| sample == 0.0));
+    }
+
+    #[test]
+    fn test_tiny_source_array() {
+        let synth = GranularSynth::new();
+        {
+            let mut buf = synth.source_array.lock().unwrap();
+            *buf = vec![0.25, 0.5];
+        }
+
+        synth.generate_grain_envelope(8);
+
+        let voice = GrainVoice::new(0.0, 1.0, 1.0);
+        let params = synth.params.lock().unwrap();
+        let out = voice.process_grain(
+            &synth.get_source_array(),
+            &synth.get_grain_envelope(),
+            &params
+        );
+
+        assert_eq!(out.len(), 4410);
+    }
+    #[test]
+    fn test_load_stereo_file() {
+        let synth = GranularSynth::new();
+
+        // With an actual stereo file, we could test it like so:
+        // let path_str = "stereo_test.wav";
+        // let bytes = path_str.as_bytes();
+        // let result = synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
+        // For demonstration, we'll just check that it returns -1 for non-existent file:
+        let path_str = "fake_stereo_test.wav";
+        let bytes = path_str.as_bytes();
+        let result = synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
+        assert_eq!(result, -1, "Expected failure for a non-existent stereo file");
+    }
+
+    #[test]
+    fn test_calculate_metro_time_in_ms() {
+        let synth = GranularSynth::new();
+        let mut params = synth.params.lock().unwrap();
+        params.grain_duration = 4410;
+        params.grain_overlap = 1.5;
+        drop(params);
+
+        // 1) (grain_duration / 2) / overlap
+        // default = (4410/2) / 1.5 = 1470 ms
+        let time_ms = synth.calculate_metro_time_in_ms();
+        assert!((time_ms - 1470.0).abs() < 1.0, "Expected around 1470 ms");
+    }
+
+    #[test]
+    fn test_generate_random_parameters() {
+        // Just check that (r_a, r_b) are in some plausible range
+        // r_a ~ 0..10000, r_b ~ 1.0..(1.0 + 200/10000.0)
+        // i.e. r_b ~ 1.0..1.02
+        for _ in 0..100 {
+            let (r_a, r_b) = GranularSynth::generate_random_parameters();
+            assert!(r_a >= 0.0 && r_a < 10001.0, "r_a out of range");
+            assert!(r_b >= 1.0 && r_b <= 1.02, "r_b out of range");
+        }
+    }
+    //
+    // 6) Simple Smoke Test for Real-Time + Scheduler
+    //
+    // This demonstrates a "no panic" test. In practice, real-time tests
+    // might be excluded in CI or done manually, because they depend on 
+    // an audio device, threads, timing, etc.
+    //
+    #[test]
+    fn test_smoke_test_play_audio() {
+        let mut synth = GranularSynth::new();
+
+        // Provide a small envelope; or, if you have a test WAV file, load it:
+        //   let file_path = "path/to/small_test.wav";
+        //   let bytes = file_path.as_bytes();
+        //   synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
+        synth.generate_grain_envelope(256);
+
+        synth.start_scheduler();
+
+        let play_result = synth.play_audio();
+        // If your environment doesn't have an output device, might fail
+        // So we won't assert 0 here, just verify no panic:
+        eprintln!("play_audio() returned: {}", play_result);
+
+        // Let it run a moment
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        // Stop scheduler
+        synth.stop_scheduler();
+
+        // If we got here without panics, consider it a success
+        assert!(true);
+    }
+
+    //
+    // 7) (Optional) Checking Overlap & Timing in Real-Time
+    //    This is more of an integration test. Shown here as a sketch:
+    //
+    // #[test]
+    // fn test_grain_overlap_timing() {
+    //     let mut synth = GranularSynth::new();
+    //     synth.generate_grain_envelope(128);
+    //     // ... load short file, or set up source_array with known data
+    //
+    //     let (tx, rx) = crossbeam_channel::unbounded::<std::time::Instant>();
+    //
+    //     // Instead of using the default route_to_grainvoice, you could 
+    //     // modify it temporarily to record a timestamp each time a new 
+    //     // grain is started:
+    //     // e.g., tx.send(Instant::now()).unwrap();
+    //
+    //     synth.start_scheduler();
+    //     synth.play_audio();
+    //
+    //     // Let it run for a while, collecting timestamps
+    //     std::thread::sleep(std::time::Duration::from_secs(2));
+    //     synth.stop_scheduler();
+    //
+    //     // Now analyze the timestamps from rx to see if they're 
+    //     // spaced approximately at calculate_metro_time_in_ms() intervals.
+    //     // For instance:
+    //     let times: Vec<_> = rx.try_iter().collect();
+    //     // assert that intervals are close to the expected ms
+    // }
 
 }
