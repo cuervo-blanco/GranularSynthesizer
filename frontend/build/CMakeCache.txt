@@ -323,9 +323,6 @@ QtRustSynth_SOURCE_DIR:STATIC=/Users/astro/Documents/AudioDev/qt_rust_synth/fron
 RUST_LIB:FILEPATH=/Users/astro/Documents/AudioDev/qt_rust_synth/backend/target/release/libbackend.dylib
 
 //Path to a library.
-RUST_LIBRARY:FILEPATH=RUST_LIBRARY-NOTFOUND
-
-//Path to a library.
 WrapOpenGL_AGL:FILEPATH=/Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/System/Library/Frameworks/AGL.framework
 
 

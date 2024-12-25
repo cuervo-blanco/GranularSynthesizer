@@ -532,6 +532,7 @@
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QGraphicsScene \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QGraphicsView \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QLabel \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QMessageBox \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QPushButton \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QSlider \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/QWidget \
@@ -539,11 +540,13 @@
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qabstractscrollarea.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qabstractslider.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qdialog.h \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qdialogbuttonbox.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qfiledialog.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qframe.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qgraphicsscene.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qgraphicsview.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qlabel.h \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qmessagebox.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qpushbutton.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qscrollarea.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Versions/A/Headers/qsizepolicy.h \

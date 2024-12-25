@@ -630,4 +630,7 @@ CMakeFiles/QtRustSynth.dir/main.cpp.o: \
   /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Headers/qfileinfo.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Headers/qtimezone.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qdialog.h \
-  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QGraphicsScene
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QGraphicsScene \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QMessageBox \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qmessagebox.h \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qdialogbuttonbox.h

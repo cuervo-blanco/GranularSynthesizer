@@ -2,20 +2,20 @@ CMakeFiles/QtRustSynth.dir/QtRustSynth_autogen/mocs_compilation.cpp.o: \
   /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/QtRustSynth_autogen/mocs_compilation.cpp \
   /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/QtRustSynth_autogen/EWIEGA46WW/moc_SynthUI.cpp \
   /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/QtRustSynth_autogen/EWIEGA46WW/../../../SynthUI.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/cstddef \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__config \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__config_site \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/pthread.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/version \
+  /Library/Developer/CommandLineTools/usr/lib/clang/14.0.0/include/stddef.h \
+  /Library/Developer/CommandLineTools/usr/lib/clang/14.0.0/include/__stddef_max_align_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__nullptr \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QWidget \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qwidget.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qtwidgetsglobal.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtGui.framework/Headers/qtguiglobal.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Headers/qglobal.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/type_traits \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__config \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__config_site \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/pthread.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/cstddef \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/version \
-  /Library/Developer/CommandLineTools/usr/lib/clang/14.0.0/include/stddef.h \
-  /Library/Developer/CommandLineTools/usr/lib/clang/14.0.0/include/__stddef_max_align_t.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__nullptr \
   /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__utility/forward.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__utility/move.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX13.1.sdk/usr/include/c++/v1/__undef_macros \
@@ -620,6 +620,9 @@ CMakeFiles/QtRustSynth.dir/QtRustSynth_autogen/mocs_compilation.cpp.o: \
   /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Headers/qtimezone.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qdialog.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QGraphicsScene \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/QMessageBox \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qmessagebox.h \
+  /Users/astro/Qt/6.8.1/macos/lib/QtWidgets.framework/Headers/qdialogbuttonbox.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtGui.framework/Headers/qtextcursor.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtGui.framework/Headers/qtextformat.h \
   /Users/astro/Qt/6.8.1/macos/lib/QtCore.framework/Headers/qtmochelpers.h
