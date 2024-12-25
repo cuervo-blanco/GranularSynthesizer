@@ -593,6 +593,79 @@ pub extern "C" fn stop_scheduler(
     synth.stop_scheduler();
 }
 
+#[repr(C)]
+pub struct GrainEnvelope {
+    data: *const f32,
+    length: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn get_grain_envelope(
+    synth_ptr: *mut GranularSynth
+    ) -> GrainEnvelope {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let grain_envelope = synth.get_grain_envelope();
+    let envelope = GrainEnvelope {
+        data: grain_envelope.as_ptr(),
+        length: grain_envelope.len(),
+    };
+    std::mem::forget(grain_envelope);
+    envelope
+}
+
+
+#[no_mangle]
+pub extern "C" fn free_grain_envelope(envelope: GrainEnvelope) {
+    unsafe {
+        if !envelope.data.is_null() {
+            let _ = Vec::from_raw_parts(
+                envelope.data as *mut f32,
+                envelope.length,
+                envelope.length,
+            );
+        }
+    }
+}
+
+#[repr(C)]
+pub struct SourceArray{
+    data: *const f32,
+    length: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn get_source_array(
+    synth_ptr: *mut GranularSynth
+    ) -> SourceArray {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let source_array = synth.get_source_array();
+    let array = SourceArray {
+        data: source_array.as_ptr(),
+        length: source_array.len(),
+    };
+    std::mem::forget(source_array);
+    array
+}
+
+
+#[no_mangle]
+pub extern "C" fn free_source_array(array: SourceArray) {
+    unsafe {
+        if !array.data.is_null() {
+            let _ = Vec::from_raw_parts(
+                array.data as *mut f32,
+                array.length,
+                array.length,
+            );
+        }
+    }
+}
 // -------------------------------------
 // TESTS
 // -------------------------------------
