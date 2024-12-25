@@ -86,6 +86,8 @@ private:
     std::vector<float> m_downsampledWaveform;
     void downsampleWaveform(const std::vector<float>& fullData,
                         std::vector<float>& outDownsampled, size_t targetSize);
+    QGraphicsPathItem* m_waveformPathItem = nullptr;
+    QGraphicsRectItem* m_grainRectItem = nullptr;
 
     QLabel *waveformLabel;
     QGraphicsView *waveformView;
@@ -121,6 +123,8 @@ private:
         size_t grainDuration,
         size_t totalSamples
     );
+    void drawFullWaveformOnce();
+    void updateGrainSelectionRect();
 };
 
 #endif // SYNTHUI_H

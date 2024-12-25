@@ -28,6 +28,15 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     waveformView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(waveformView, 3);
 
+    m_waveformPathItem = new QGraphicsPathItem();
+    m_waveformPathItem->setPen(QPen(Qt::blue, 1.0));
+    waveformScene->addItem(m_waveformPathItem);
+
+    m_grainRectItem = new QGraphicsRectItem();
+    m_grainRectItem->setPen(QPen(Qt::red, 1.0));
+    m_grainRectItem->setBrush(Qt::NoBrush);
+    waveformScene->addItem(m_grainRectItem);
+
     // Envelope
     grainEnvelopeLabel = new QLabel("Grain Envelope:", this);
     mainLayout->addWidget(grainEnvelopeLabel);
@@ -121,7 +130,15 @@ void SynthUI::onLoadFileClicked() {
 
     if (!loadedFilePath.isEmpty()) {
         load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
-        updateWaveformDisplay();
+        SourceArray array = get_source_array(synthPtr);
+        std::vector<float> fullSamples(array.length);
+        for (size_t i = 0; i < array.length; ++i) {
+            fullSamples[i] = array.data[i];
+        }
+        free_source_array(array);
+        downsampleWaveform(fullSamples, m_downsampledWaveform, 2048);
+        drawFullWaveformOnce();
+        updateGrainSelectionRect();
     }
 
 }
@@ -130,31 +147,36 @@ void SynthUI::onGrainStartReleased(int value) {
     grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
-    updateWaveformDisplay();
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainDurationReleased(int value) {
     grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
-    updateWaveformDisplay();
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainPitchReleased(int value) {
     grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
     float pitch = static_cast<float>(value) / 10.0f;
     set_grain_pitch(synthPtr, pitch);
-    updateWaveformDisplay();
+    updateGrainSelectionRect();
 }
 void SynthUI::onOverlapReleased(int value) {
     overlapLabel->setText(QString("Overlap: %1").arg(value));
     float overlap = static_cast<float>(value) / 10.0f;
     set_overlap(synthPtr, overlap);
-    updateWaveformDisplay();
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onPlayAudioClicked() {
+    if (!enginePtr) {
+        enginePtr = create_audio_engine(synthPtr);
+    }
     start_scheduler(synthPtr);
+    // re-create the stream if necessary or if the Rust code
+    // can handle it automatically, just call start
     int result = audio_engine_start(enginePtr);
     if (result != 0) {
         stop_scheduler(synthPtr);
@@ -166,50 +188,75 @@ void SynthUI::onPlayAudioClicked() {
 void SynthUI::onStopAudioClicked() {
     stop_scheduler(synthPtr);
     audio_engine_stop(enginePtr);
+    // Possibly also destroy the engine?
+    // destroy_audio_engine(enginePtr);
+    // enginePtr = nullptr;
 }
 
-void SynthUI::updateWaveformDisplay() {
-    waveformScene->clear();
-    
-    SourceArray array = get_source_array(synthPtr);
-    std::vector<float> samples(array.length);
-    for (size_t i = 0; i < array.length; ++i) {
-        samples[i] = array.data[i];
+void SynthUI::drawFullWaveformOnce(){
+    if (m_downsampledWaveform.empty()) {
+        m_waveformPathItem->setPath(QPainterPath());
+        waveformScene->setSceneRect(0, 0, waveformView->width(), waveformView->height());
+        return;
     }
+
+    double sceneWidth  = waveformView->width();
+    double sceneHeight = waveformView->height();
+    double step = m_downsampledWaveform.size() / sceneWidth;
+
+    QPainterPath path;
+    path.moveTo(0, sceneHeight / 2.0);
+
+    for (double x = 0; x < sceneWidth; x++)
+    {
+        size_t index = static_cast<size_t>(x * step);
+        if (index >= m_downsampledWaveform.size()) break;
+        double sampleVal = m_downsampledWaveform[index];
+        double y = (sceneHeight / 2.0) - (sampleVal * (sceneHeight / 2.0));
+        path.lineTo(x, y);
+    }
+
+    m_waveformPathItem->setPath(path);
+    m_waveformPathItem->setPen(QPen(Qt::blue)); // color, thickness, etc.
+
+    waveformScene->setSceneRect(0, 0, sceneWidth, sceneHeight);
+}
+void SynthUI::updateGrainSelectionRect()
+{
+    SourceArray array = get_source_array(synthPtr);
+    size_t totalSamples = array.length;
     free_source_array(array);
 
-    if (!samples.empty()) {
-        double sceneWidth = waveformView->width();
-        double sceneHeight = waveformView->height();
-        double step = samples.size() / sceneWidth;
-
-        QPainterPath path;
-        path.moveTo(0, sceneHeight / 2.0);
-        for (double x = 0; x < sceneWidth; x++) {
-            size_t index = static_cast<size_t>(x * step);
-            if (index >= samples.size()) break;
-            double sampleVal = samples[index];
-            double y = (sceneHeight / 2.0) - (sampleVal * (sceneHeight / 2.0));
-            path.lineTo(x, y);
-        }
-
-        size_t totalSamples = samples.size();
-        double fraction = static_cast<double>(grainStartSlider->value()) / 100.0f;
-        size_t grainStartSample = fraction * totalSamples;
-        size_t grainDuration = grainDurationSlider->value();
-
-        waveformScene->addPath(path, QPen(Qt::blue));
-        waveformScene->setSceneRect(0, 0, sceneWidth, sceneHeight);
-        drawGrainSelectionRect(waveformScene, sceneWidth, sceneHeight,
-                grainStartSample, grainDuration, totalSamples);
-    } else {
-        // fallback if no samples
-        waveformScene->addText("No samples loaded!");
+    if (totalSamples == 0) {
+        // no file loaded, hide or set rect to 0
+        m_grainRectItem->setRect(0,0,0,0);
+        return;
     }
-    // This is a fairly minimal approach. If the audio is very large, 
-    // we can consider downsampling more aggressively or only showing a portion 
-    // to avoid performance issues in the UI thread.
 
+    double sceneWidth  = waveformView->width();
+    double sceneHeight = waveformView->height();
+
+    double fractionStart = static_cast<double>(grainStartSlider->value()) / 100.0;
+    // grainDurationSlider is, say, 100..10000 => treat it as a # of samples?
+    // We'll interpret it as "grainDuration" samples, so fractionDur = grainDuration / totalSamples
+    double grainDurationSamples = static_cast<double>(grainDurationSlider->value());
+    double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
+
+    // clamp fractionDur so it can't exceed the total
+    if (fractionDur > 1.0) fractionDur = 1.0;
+
+    // Compute final positions in the scene
+    double startX = fractionStart * sceneWidth;
+    double widthX = fractionDur   * sceneWidth;
+
+    // Bound them
+    if (startX < 0) startX = 0;
+    if ((startX + widthX) > sceneWidth) {
+        widthX = sceneWidth - startX;
+    }
+
+    // Move/resize the rectangle
+    m_grainRectItem->setRect(startX, 0, widthX, sceneHeight);
 }
 
 void SynthUI::updateEnvelopeDisplay() {
@@ -269,4 +316,27 @@ void SynthUI::drawGrainSelectionRect(
     grainRect->setBrush(Qt::NoBrush);
 
     scene->addItem(grainRect);
+}
+void SynthUI::downsampleWaveform(
+        const std::vector<float>& fullData,
+        std::vector<float>& outDownsampled,
+        size_t targetSize
+        ) {
+    outDownsampled.clear();
+    if (fullData.empty() || targetSize == 0) return;
+
+    outDownsampled.reserve(targetSize);
+    size_t step = std::max<size_t>(1, fullData.size() / targetSize);
+
+    for (size_t i = 0; i < targetSize; i++) {
+        size_t index = i * step;
+        if (index >= fullData.size()) break;
+        outDownsampled.push_back(fullData[index]);
+    }
+}
+
+void SynthUI::resizeEvent(QResizeEvent* event){
+    QWidget::resizeEvent(event); // call base
+    drawFullWaveformOnce();      // re-draw waveform path at new size
+    updateGrainSelectionRect();  // reposition rectangle
 }

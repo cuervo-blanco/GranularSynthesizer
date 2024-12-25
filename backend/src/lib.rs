@@ -108,6 +108,11 @@ impl AudioEngine {
     }
 
     pub fn start(&mut self) -> i32 {
+
+        if let Some(existing) = self.stream.take() {
+            drop(existing);
+        }
+
         let host = cpal::default_host();
         let output_device = match host.default_output_device() {
             Some(device) => device,
@@ -129,6 +134,7 @@ impl AudioEngine {
         let grains_arc = Arc::clone(&active_grains);
 
         let receiver_for_callback = Arc::clone(&self.synth.grain_receiver);
+
 
         let stream = match output_device.build_output_stream(
             &config.into(),
@@ -235,6 +241,7 @@ impl GranularSynth {
 
     pub fn start_scheduler(&self) {
         let synth_clone = self.clone_for_thread(); 
+        self.should_stop.store(false, Ordering::SeqCst);
         thread::spawn(move || {
             let metro_time = synth_clone.calculate_metro_time_in_ms();
             let interval = Duration::from_millis(metro_time as u64);
@@ -261,6 +268,7 @@ impl GranularSynth {
     /// We could also drop the Arc if we wanted.
     pub fn stop_scheduler(&self) {
         self.should_stop.store(true, Ordering::SeqCst);
+        // join or handle the thread
     }
 
     // One detail: to move `GranularSynth` into a thread’s closure, 
