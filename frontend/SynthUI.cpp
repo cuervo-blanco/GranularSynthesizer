@@ -214,8 +214,14 @@ void SynthUI::updateWaveformDisplay() {
             path.lineTo(x, y);
         }
 
+        size_t totalSamples = samples.size();
+        size_t grainStartSample = grainStartSlider->value() / 100.0f;
+        size_t grainDuration = grainDurationSlider->value();
+
         waveformScene->addPath(path, QPen(Qt::blue));
         waveformScene->setSceneRect(0, 0, sceneWidth, sceneHeight);
+        drawGrainSelectionRect(waveformScene, sceneWidth, sceneHeight,
+                grainStartSample, grainDuration, totalSamples);
     } else {
         // fallback if no samples
         waveformScene->addText("No samples loaded!");
@@ -259,4 +265,28 @@ void SynthUI::updateEnvelopeDisplay() {
     }
 }
 
-void SynthUI::drawGrainSelectionRect
+void SynthUI::drawGrainSelectionRect(
+        QGraphicsScene* scene,
+        double sceneWidth,
+        double sceneHeight,
+        size_t grainStartSample,
+        size_t grainDuration,
+        size_t totalSamples
+    ) {
+    double startX = (grainStartSample / (double)totalSamples) * sceneWidth;
+    double endX = 
+        ((grainStartSample + grainDuration) / (double)totalSamples) * sceneWidth;
+
+    startX = qBound(0.0, startX, sceneWidth);
+    endX = qBound(0.0, endX, sceneWidth);
+    double rectWidth = endX - startX;
+
+    QGraphicsRectItem *grainRect = new QGraphicsRectItem(
+            startX, 0.0,
+            rectWidth, sceneHeight
+    );
+    grainRect->setPen(QPen(Qt::red, 1.0));
+    grainRect->setBrush(Qt::NoBrush);
+
+    scene->addItem(grainRect);
+}
