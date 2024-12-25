@@ -123,6 +123,7 @@ void SynthUI::onGrainStartChanged(int value) {
             overlap,
             pitch);
     generate_grain_envelope(synthPtr, 2048);
+    updateWaveformDisplay();
     updateEnvelopeDisplay();
 }
 
@@ -139,6 +140,7 @@ void SynthUI::onGrainDurationChanged(int value) {
             overlap,
             pitch);
     generate_grain_envelope(synthPtr, 2048);
+    updateWaveformDisplay();
     updateEnvelopeDisplay();
 }
 
@@ -155,6 +157,7 @@ void SynthUI::onGrainPitchChanged(int value) {
             overlap,
             pitch);
     generate_grain_envelope(synthPtr, 2048);
+    updateWaveformDisplay();
     updateEnvelopeDisplay();
 }
 
@@ -171,6 +174,7 @@ void SynthUI::onOverlapChanged(int value) {
             overlap,
             pitch);
     generate_grain_envelope(synthPtr, 2048);
+    updateWaveformDisplay();
     updateEnvelopeDisplay();
 }
 
@@ -200,8 +204,8 @@ void SynthUI::updateWaveformDisplay() {
     free_source_array(array);
 
     if (!samples.empty()) {
-        double sceneWidth = 400.0;
-        double sceneHeight = 100.0;
+        double sceneWidth = waveformView->width();
+        double sceneHeight = waveformView->height();
         double step = samples.size() / sceneWidth;
 
         QPainterPath path;

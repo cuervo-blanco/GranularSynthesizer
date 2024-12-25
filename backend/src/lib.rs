@@ -13,6 +13,7 @@ use rand::Rng;
 use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::sync::atomic::Ordering;
+use std::os::raw::{c_int};
 
 // -------------------------------------
 // SPECS, PARAMS
@@ -91,6 +92,18 @@ impl GrainVoice {
         output
     }
 }
+// -------------------------------------
+// AUDIO ENGINE STRUCT
+// -------------------------------------
+pub struct AudioEngine {
+    stream: Option<cpal::Stream>,
+    synth: Arc<GranularSynth>,  // or references to crossbeam channels
+}
+
+impl AudioEngine {
+    pub fn 
+}
+
 
 // -------------------------------------
 // MAIN SYNTH STRUCT
@@ -217,6 +230,7 @@ impl GranularSynth {
         let params = self.params.lock().unwrap();
         let grain_data = voices[*counter]
             .process_grain(source_array, grain_env, &params);
+        eprintln!("Grain data length = {}", grain_data.len());
 
         self.grain_sender.send(grain_data).ok();
     }
@@ -319,6 +333,9 @@ impl GranularSynth {
             &config.into(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 // Add grains from the receiver to the active grains list
+                eprintln!(
+                    "Audio callback called with buffer len = {}", data.len()
+                );
                 while let Ok(grain_data) = receiver.try_recv() {
                     let mut grains = grains_arc.lock().unwrap();
                     grains.push(ActiveGrain::new(grain_data));
@@ -352,6 +369,8 @@ impl GranularSynth {
             eprintln!("Failed to play stream: {}", e);
             return -1;
         }
+
+        self.audio_stream = Some(stream);
 
         0
     }

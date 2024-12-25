@@ -103,6 +103,14 @@ private:
 
     void updateWaveformDisplay();
     void updateEnvelopeDisplay();
+    void drawGrainSelectionRect(
+        QGraphicsScene* scene,
+        double sceneWidth,
+        double sceneHeight,
+        size_t grainStartSample,
+        size_t grainDuration,
+        size_t totalSamples
+    );
 };
 
 #endif // SYNTHUI_H
