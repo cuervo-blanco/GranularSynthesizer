@@ -13,7 +13,6 @@ use rand::Rng;
 use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::sync::atomic::Ordering;
-use std::os::raw::{c_int};
 
 // -------------------------------------
 // SPECS, PARAMS
@@ -101,7 +100,81 @@ pub struct AudioEngine {
 }
 
 impl AudioEngine {
-    pub fn 
+    pub fn new(synth: Arc<GranularSynth>) -> Self {
+        AudioEngine {
+            synth,
+            stream: None,
+        }
+    }
+
+    pub fn start(&mut self) -> i32 {
+        let host = cpal::default_host();
+        let output_device = match host.default_output_device() {
+            Some(device) => device,
+            None => {
+                eprintln!("No output device found");
+                return -1;
+            }
+        };
+
+        let config = match output_device.default_output_config() {
+            Ok(config) => config,
+            Err(e) => {
+                eprintln!("Could not get default output config: {}", e);
+                return -1;
+            }
+        };
+        
+        let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
+        let grains_arc = Arc::clone(&active_grains);
+
+        let receiver_for_callback = Arc::clone(&self.synth.grain_receiver);
+
+        let stream = match output_device.build_output_stream(
+            &config.into(),
+            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                while let Ok(grain_data) = receiver_for_callback.try_recv() {
+                    let mut vec = grains_arc.lock().unwrap();
+                    vec.push(ActiveGrain::new(grain_data));
+                }
+
+            let mut grains = grains_arc.lock().unwrap();
+            for frame in data.chunks_mut(2) {
+                    let mut mix_sample = 0.0;
+                    for g in grains.iter_mut() {
+                        mix_sample += g.next_sample();
+                    }
+                    frame[0] = mix_sample;
+                    frame[1] = mix_sample;
+                }
+                grains.retain(|g| !g.is_finished());
+            },
+            move |err| {
+                eprintln!("Stream error: {}", err);
+            },
+            None
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("Failed to build output stream: {}", e);
+                return -1;
+            }
+        };
+
+        if let Err(e) = stream.play() {
+            eprintln!("Failed to play stream: {}", e);
+            return -1;
+        }
+
+        // Store it so it doesn't drop
+        self.stream = Some(stream);
+
+        0
+    }
+
+    pub fn stop(&mut self) {
+        self.stream.take();
+    }
 }
 
 
@@ -115,8 +188,8 @@ pub struct GranularSynth {
     params: Arc<Mutex<GrainParams>>,
     counter: Arc<Mutex<usize>>,
     should_stop: Arc<AtomicBool>,
-    grain_sender: Sender<Vec<f32>>,
-    grain_receiver: Receiver<Vec<f32>>,
+    grain_sender: Arc<Sender<Vec<f32>>>,
+    grain_receiver: Arc<Receiver<Vec<f32>>>,
 }
 impl GranularSynth {
     pub fn new() -> Self {
@@ -147,8 +220,8 @@ impl GranularSynth {
             })),
             counter: Arc::new(Mutex::new(0)),
             should_stop: Arc::new(AtomicBool::new(false)),
-            grain_sender: s,
-            grain_receiver: r, 
+            grain_sender: Arc::new(s),
+            grain_receiver: Arc::new(r), 
         }
     }
 
@@ -189,10 +262,8 @@ impl GranularSynth {
 
     // One detail: to move `GranularSynth` into a thread’s closure, 
     // you need to clone the Arc fields. 
-    #[allow(dead_code)]
     fn clone_for_thread(&self) -> GranularSynth {
-        let (new_sender, new_receiver) = crossbeam_channel::unbounded();
-
+        //let (new_sender, new_receiver) = crossbeam_channel::unbounded();
         GranularSynth {
             source_array: Arc::clone(&self.source_array),
             grain_env: Arc::clone(&self.grain_env),
@@ -200,8 +271,8 @@ impl GranularSynth {
             params: Arc::clone(&self.params),
             counter: Arc::clone(&self.counter),
             should_stop: Arc::clone(&self.should_stop),
-            grain_receiver: new_receiver,
-            grain_sender: new_sender,
+            grain_receiver: Arc::clone(&self.grain_receiver),
+            grain_sender: Arc::clone(&self.grain_sender),
         }
     }
 
@@ -305,75 +376,6 @@ impl GranularSynth {
         params.grain_overlap = overlap.clamp(1.0, 2.0) as f32;
         params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
     }
-    
-    pub fn play_audio(&mut self) -> i32 {
-        let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
-        let receiver = self.grain_receiver.clone();
-        let host = cpal::default_host();
-
-        let output_device = match host.default_output_device() {
-            Some(device) => device,
-            None => {
-                eprintln!("No output device found");
-                return -1;
-            }
-        };
-
-        let config = match output_device.default_output_config() {
-            Ok(config) => config,
-            Err(e) => {
-                eprintln!("Could not get default output config: {}", e);
-                return -1;
-            }
-        };
-
-        let grains_arc = Arc::clone(&active_grains);
-
-        let stream = match output_device.build_output_stream(
-            &config.into(),
-            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                // Add grains from the receiver to the active grains list
-                eprintln!(
-                    "Audio callback called with buffer len = {}", data.len()
-                );
-                while let Ok(grain_data) = receiver.try_recv() {
-                    let mut grains = grains_arc.lock().unwrap();
-                    grains.push(ActiveGrain::new(grain_data));
-                }
-
-                // Generate audio samples for playback
-                let mut grains = grains_arc.lock().unwrap();
-                for frame in data.chunks_mut(2) {
-                    let mut mix_sample = 0.0;
-                    for grain in grains.iter_mut() {
-                        mix_sample += grain.next_sample();
-                    }
-                    frame[0] = mix_sample;
-                    frame[1] = mix_sample;
-                }
-                grains.retain(|g| !g.is_finished());
-            },
-            move |err| {
-                eprintln!("Stream error: {}", err);
-            },
-            None
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Failed to build output stream: {}", e);
-                return -1;
-            }
-        };
-
-        if let Err(e) = stream.play() {
-            eprintln!("Failed to play stream: {}", e);
-            return -1;
-        }
-
-        self.audio_stream = Some(stream);
-
-        0
-    }
 }
 
 // -------------------------------------
@@ -406,6 +408,9 @@ impl ActiveGrain {
     }
 
 }
+// -------------------------------------
+// HELPER FUNCTIONS
+// -------------------------------------
 
 #[allow(dead_code)]
 fn linear_interpolation(buffer: &[f32], x: f32) -> f32 {
@@ -471,6 +476,50 @@ pub extern "C" fn destroy_synth(ptr: *mut GranularSynth) {
     }
     unsafe {
         let _ = Box::from_raw(ptr);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn create_audio_engine(
+    synth_ptr: *mut GranularSynth
+    ) -> *mut AudioEngine {
+    unsafe {
+        assert!(!synth_ptr.is_null());
+        let synth_ref = &*synth_ptr;
+        let arc_synth = Arc::new(synth_ref.clone_for_thread());
+        let engine = AudioEngine::new(arc_synth);
+        let boxed = Box::new(engine);
+        Box::into_raw(boxed)
+    } 
+}
+
+#[no_mangle]
+pub extern "C" fn audio_engine_start(engine_ptr: *mut AudioEngine) -> c_int {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.start()
+}
+
+
+#[no_mangle]
+pub extern "C" fn audio_engine_stop(engine_ptr: *mut AudioEngine) {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.stop();
+}
+
+
+#[no_mangle]
+pub extern "C" fn destroy_audio_engine(engine_ptr: *mut AudioEngine) {
+    if engine_ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(engine_ptr);
     }
 }
 
@@ -577,17 +626,6 @@ pub extern "C" fn set_overlap(
     };
     let mut params = synth.params.lock().unwrap();
     params.grain_overlap = overlap.clamp(1.0, 2.0);
-}
-
-#[no_mangle]
-pub extern "C" fn play_audio(
-    synth_ptr: *mut GranularSynth
-    ) -> c_int {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &mut *synth_ptr
-    };
-    synth.play_audio()
 }
 
 #[no_mangle]

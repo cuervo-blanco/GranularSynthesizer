@@ -8,6 +8,7 @@
 // Constructor
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     synthPtr = create_synth();
+    enginePtr = create_audio_engine(synthPtr);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
@@ -88,6 +89,11 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
 // Destructor
 SynthUI::~SynthUI() {
+    if (enginePtr) {
+        audio_engine_stop(enginePtr);
+        destroy_audio_engine(enginePtr);
+        enginePtr = nullptr;
+    }
     if (synthPtr) {
         destroy_synth(synthPtr);
         synthPtr = nullptr;
@@ -180,7 +186,7 @@ void SynthUI::onOverlapChanged(int value) {
 
 void SynthUI::onPlayAudioClicked() {
     start_scheduler(synthPtr);
-    int result = play_audio(synthPtr);
+    int result = audio_engine_start(enginePtr);
     if (result != 0) {
         stop_scheduler(synthPtr);
         QMessageBox::critical(this, "Audio Playback Error",
@@ -190,7 +196,7 @@ void SynthUI::onPlayAudioClicked() {
 
 void SynthUI::onStopAudioClicked() {
     stop_scheduler(synthPtr);
-    // Make a Rust function to stop the audio stream!
+    audio_engine_stop(enginePtr);
 }
 
 void SynthUI::updateWaveformDisplay() {
