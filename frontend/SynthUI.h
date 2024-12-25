@@ -83,6 +83,10 @@ private:
     GranularSynth* synthPtr = nullptr;
     AudioEngine* enginePtr = nullptr;
 
+    std::vector<float> m_downsampledWaveform;
+    void downsampleWaveform(const std::vector<float>& fullData,
+                        std::vector<float>& outDownsampled, size_t targetSize);
+
     QLabel *waveformLabel;
     QGraphicsView *waveformView;
     QGraphicsScene *waveformScene;

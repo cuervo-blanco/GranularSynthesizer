@@ -45,14 +45,14 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainStartLabel = new QLabel("Grain Start", this);
     grainStartSlider = new QSlider(Qt::Horizontal, this);
     grainStartSlider->setRange(0,100);
-    connect(grainStartSlider, &QSlider::valueChanged, this, &SynthUI::onGrainStartChanged);
+    connect(grainStartSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainStartReleased);
     sliderLayout->addWidget(grainStartLabel);
     sliderLayout->addWidget(grainStartSlider);
 
     grainDurationLabel = new QLabel("Grain Duration", this);
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
     grainDurationSlider->setRange(100, 10000);
-    connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationChanged);
+    connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
     sliderLayout->addWidget(grainDurationLabel);
     sliderLayout->addWidget(grainDurationSlider);
 
@@ -60,7 +60,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainPitchSlider = new QSlider(Qt::Horizontal, this);
     grainPitchSlider->setRange(1, 20);
     grainPitchSlider->setValue(10);
-    connect(grainPitchSlider, &QSlider::valueChanged, this, &SynthUI::onGrainPitchChanged);
+    connect(grainPitchSlider, &QSlider::valueReleased, this, &SynthUI::onGrainPitchReleased);
     sliderLayout->addWidget(grainPitchLabel);
     sliderLayout->addWidget(grainPitchSlider);
 
@@ -68,7 +68,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     overlapSlider = new QSlider(Qt::Horizontal, this);
     overlapSlider->setRange(10, 20);
     overlapSlider->setValue(20);
-    connect(overlapSlider, &QSlider::valueChanged, this, &SynthUI::onOverlapChanged);
+    connect(overlapSlider, &QSlider::valueReleased, this, &SynthUI::onOverlapReleased);
     sliderLayout->addWidget(overlapLabel);
     sliderLayout->addWidget(overlapSlider);
 
@@ -113,33 +113,40 @@ void SynthUI::onLoadFileClicked() {
     loadedFilePath = QFileDialog::getOpenFileName(
             this, "Open Audio File", "", "WAV Files (*.wav)"
     );
+    grainStartSlider->setValue(0);
+    grainDurationSlider->setValue(1000);  // or whatever default
+    grainPitchSlider->setValue(10);      // i.e. pitch=1.0
+    overlapSlider->setValue(20);         // i.e. overlap=2.0
+    set_params(synthPtr, 0, 4410, 2.0f, 1.0f);
+
     if (!loadedFilePath.isEmpty()) {
         load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
         updateWaveformDisplay();
     }
+
 }
 
-void SynthUI::onGrainStartChanged(int value) {
+void SynthUI::onGrainStartReleased(int value) {
     grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
     updateWaveformDisplay();
 }
 
-void SynthUI::onGrainDurationChanged(int value) {
+void SynthUI::onGrainDurationReleased(int value) {
     grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
     updateWaveformDisplay();
 }
 
-void SynthUI::onGrainPitchChanged(int value) {
+void SynthUI::onGrainPitchReleased(int value) {
     grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
     float pitch = static_cast<float>(value) / 10.0f;
     set_grain_pitch(synthPtr, pitch);
     updateWaveformDisplay();
 }
-void SynthUI::onOverlapChanged(int value) {
+void SynthUI::onOverlapReleased(int value) {
     overlapLabel->setText(QString("Overlap: %1").arg(value));
     float overlap = static_cast<float>(value) / 10.0f;
     set_overlap(synthPtr, overlap);
@@ -187,7 +194,8 @@ void SynthUI::updateWaveformDisplay() {
         }
 
         size_t totalSamples = samples.size();
-        size_t grainStartSample = grainStartSlider->value() / 100.0f;
+        double fraction = static_cast<double>(grainStartSlider->value()) / 100.0f;
+        size_t grainStartSample = fraction * totalSamples;
         size_t grainDuration = grainDurationSlider->value();
 
         waveformScene->addPath(path, QPen(Qt::blue));
