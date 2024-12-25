@@ -26,6 +26,10 @@ the user.
 
 ### `GrainVoice`
 **Purpose**: Represents a single grain voice.
+- **Components**:
+  - `mystart`: Starting point of the GrainVoice
+  - `mypitch`: Random Pitch of the GrainVoice.
+  - `mydur`: Duration of the GrainVoice, always 1.
 - **Methods**:
   - `new`: Constructs a new `GrainVoice` with starting position, pitch, and duration.
   - `process_grain`: Generates audio data for a grain by applying an envelope 
@@ -75,6 +79,70 @@ the user.
 
 ### `linear_interpolation`
 **Purpose**: Simplifies interpolation using two adjacent points for smooth transitions.
+
+---
+# Extern "C" Functions
+---
+
+## FRONT-END API
+
+### `create_synth`
+**Purpose**: Creates a new `GranularSynth` instance.
+- Allocates the `GranularSynth` struct on the heap.
+- Returns a raw pointer to the allocated struct for use in C/C++.
+
+---
+
+### `destroy_synth`
+**Purpose**: Deallocates a `GranularSynth` instance.
+- Checks if the pointer is null. If null, no action is taken.
+- Converts the raw pointer back to a `Box` to ensure it is properly dropped and freed.
+
+---
+
+### `load_audio_from_file`
+**Purpose**: Loads an audio file into the `GranularSynth` instance.
+- Verifies the provided `synth_ptr` and `file_path` are not null.
+- Converts the C-style string (`file_path`) to a Rust string.
+- Calls the `load_audio_from_file` method of `GranularSynth`.
+- Returns an integer indicating success (`0`) or failure (`-1`).
+
+---
+
+### `generate_grain_envelope`
+**Purpose**: Generates a grain envelope of a specified size.
+- Verifies the `synth_ptr` is not null.
+- Calls the `generate_grain_envelope` method of the `GranularSynth` with the given size.
+
+---
+
+### `set_params`
+**Purpose**: Configures granular synthesis parameters.
+- Verifies the `synth_ptr` is not null.
+- Updates grain parameters such as start position, duration, overlap, and pitch by calling the `set_params` method of the `GranularSynth`.
+
+---
+
+### `play_audio`
+**Purpose**: Starts audio playback.
+- Verifies the `synth_ptr` is not null.
+- Obtains a mutable reference to the `GranularSynth` instance.
+- Calls the `play_audio` method to begin streaming audio.
+- Returns an integer indicating success (`0`) or failure (`-1`).
+
+---
+
+### `start_scheduler`
+**Purpose**: Starts the grain scheduling process.
+- Verifies the `synth_ptr` is not null.
+- Calls the `start_scheduler` method of the `GranularSynth` to initiate the scheduling thread.
+
+---
+
+### `stop_scheduler`
+**Purpose**: Stops the grain scheduling process.
+- Verifies the `synth_ptr` is not null.
+- Calls the `stop_scheduler` method of the `GranularSynth` to terminate the scheduling thread.
 
 ---
 

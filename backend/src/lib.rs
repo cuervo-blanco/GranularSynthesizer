@@ -72,27 +72,24 @@ impl GrainVoice {
             let env_pos = i as f32 / (duration_in_samples as f32);
             // Map env_pos [0..1] -> [0..grain_env.len()-1] 
             let env_index_float = env_pos * (grain_env.len() as f32 - 1.0);
-            //let env_index = env_index_float.floor() as usize;
+            // let env_index = env_index_float.floor() as usize;
             // Later do linear interpolation for a smoother read
             let envelope_value = 
-                four_point_interpolation(
-                    grain_env, env_index_float
-                    );
+                four_point_interpolation(grain_env, env_index_float);
             // ----------------------------
             // 2) Source read ramp
             // ----------------------------
-            // Each sample, we move forward by `playback_rate`
+            // Each sample, we move forward by `playback_rate` (set by pitch)
             // starting from `base_source_start`.
             let source_index_float = base_source_start + (i as f32 * playback_rate);
-
-            let source_value = four_point_interpolation(source_array, source_index_float);
+            let source_value = 
+                four_point_interpolation(source_array, source_index_float);
             
             output[i] = source_value * envelope_value;
         }
 
         output
     }
-
 }
 
 // -------------------------------------
@@ -149,24 +146,20 @@ impl GranularSynth {
 
     pub fn start_scheduler(&self) {
         let synth_clone = self.clone_for_thread(); 
-        // see below on how to clone needed fields
-
         thread::spawn(move || {
-            // This is the old schedule_grains loop, 
-            // but we exit if should_stop is set to true.
             let metro_time = synth_clone.calculate_metro_time_in_ms();
             let interval = Duration::from_millis(metro_time as u64);
             let mut next_time = Instant::now();
 
+            // mientras sea falso
             while !synth_clone.should_stop.load(Ordering::SeqCst) {
                 let now = Instant::now();
                 if now >= next_time {
-                    synth_clone.increment_counter();
-
                     synth_clone.route_to_grainvoice(
                         &synth_clone.get_source_array(),
                         &synth_clone.get_grain_envelope(),
                     );
+                    synth_clone.increment_counter();
                     // Schedule next event
                     next_time = now + interval;
                 } else {
@@ -176,8 +169,7 @@ impl GranularSynth {
         });
     }
 
-    /// Request the scheduler thread to stop.
-    /// You could also drop the Arc if you want. 
+    /// We could also drop the Arc if we wanted.
     pub fn stop_scheduler(&self) {
         self.should_stop.store(true, Ordering::SeqCst);
     }
@@ -235,8 +227,7 @@ impl GranularSynth {
         let r_b = rng.gen_range(0..200) as f32 / 10000.0 + 1.0;
         (r_a, r_b)
     }
-    #[no_mangle]
-    pub extern "C" fn load_audio_from_file(
+    pub fn load_audio_from_file(
         &self, 
         file_path: *const u8,
         file_path_len: usize
@@ -273,8 +264,7 @@ impl GranularSynth {
             Err(_) => -1,
         }
     }
-    #[no_mangle]
-    pub extern "C" fn generate_grain_envelope(&self, size: usize) {
+    pub fn generate_grain_envelope(&self, size: usize) {
         let mut env = self.grain_env.lock().unwrap();
         env.clear();
         for i in 0..size {
@@ -302,8 +292,7 @@ impl GranularSynth {
         params.grain_pitch = pitch.clamp(0.1, 2.0) as f32 * params.specs.sample_rate as f32;
     }
     
-    #[no_mangle]
-    pub extern "C" fn play_audio(&mut self) -> i32 {
+    pub fn play_audio(&mut self) -> i32 {
         let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
         let receiver = self.grain_receiver.clone();
         let host = cpal::default_host();
@@ -439,6 +428,169 @@ fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
     let frac3 = frac2 * frac;
 
     s1 + c1 * frac + c2 * frac2 + c3 * frac3
+}
+
+// -------------------------------------
+// FRONT-END SPECIFIC API
+// -------------------------------------
+#[allow(unused_imports)]
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
+#[allow(unused_imports)]
+use std::ptr;
+
+#[no_mangle]
+pub extern "C" fn create_synth() -> *mut GranularSynth {
+    let synth = Box::new(GranularSynth::new());
+    Box::into_raw(synth)
+}
+
+#[no_mangle]
+pub extern "C" fn destroy_synth(ptr: *mut GranularSynth) {
+    if ptr.is_null() {
+        return;
+    }
+    unsafe {
+        let _ = Box::from_raw(ptr);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn load_audio_from_file(
+    synth_ptr: *mut GranularSynth,
+    file_path: *const c_char,
+    ) -> c_int {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    
+    if file_path.is_null() {
+        return -1;
+    }
+    let c_str = unsafe {std::ffi::CStr::from_ptr(file_path)};
+    let path_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let result = 
+        synth.load_audio_from_file(
+            path_str.as_bytes().as_ptr(), path_str.len());
+    result
+}
+
+#[no_mangle]
+pub extern "C" fn generate_grain_envelope(
+    synth_ptr: *mut GranularSynth,
+    size: usize,
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.generate_grain_envelope(size);
+}
+
+#[no_mangle]
+pub extern "C" fn set_params(
+    synth_ptr: *mut GranularSynth,
+    start: usize,
+    duration: usize,
+    overlap: f32,
+    pitch: f32,
+    ){
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.set_params(start, duration, overlap, pitch);
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_start(
+    synth_ptr: *mut GranularSynth, 
+    start: usize
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_start = 
+        (start.clamp(0, 1) as f32 * params.specs.filesize as f32) as usize;
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_duration(
+    synth_ptr: *mut GranularSynth, 
+    duration: usize
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_duration = duration;
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_pitch(
+    synth_ptr: *mut GranularSynth, 
+    pitch: f32
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_pitch = pitch.clamp(0.1, 2.0) as f32 * params.specs.sample_rate as f32;
+}
+
+#[no_mangle]
+pub extern "C" fn set_overlap(
+    synth_ptr: *mut GranularSynth, 
+    overlap: f32
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_overlap = overlap.clamp(1.0, 2.0);
+}
+
+#[no_mangle]
+pub extern "C" fn play_audio(
+    synth_ptr: *mut GranularSynth
+    ) -> c_int {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    synth.play_audio()
+}
+
+#[no_mangle]
+pub extern "C" fn start_scheduler(
+    synth_ptr: *mut GranularSynth
+    ){
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    synth.start_scheduler();
+}
+
+#[no_mangle]
+pub extern "C" fn stop_scheduler(
+    synth_ptr: *mut GranularSynth
+    ) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.stop_scheduler();
 }
 
 // -------------------------------------
