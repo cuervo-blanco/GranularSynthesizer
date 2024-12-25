@@ -289,7 +289,7 @@ impl GranularSynth {
         params.grain_start = (start.clamp(0, 1) as f32 * params.specs.filesize as f32) as usize;
         params.grain_duration = duration;
         params.grain_overlap = overlap.clamp(1.0, 2.0) as f32;
-        params.grain_pitch = pitch.clamp(0.1, 2.0) as f32 * params.specs.sample_rate as f32;
+        params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
     }
     
     pub fn play_audio(&mut self) -> i32 {

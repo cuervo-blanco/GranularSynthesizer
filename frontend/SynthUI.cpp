@@ -2,6 +2,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileDialog>
+#include <QMessageBox>
 #include <QGraphicsRectItem>
 
 // Constructor
@@ -21,7 +22,9 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     waveformView = new QGraphicsView(this);
     waveformScene = new QGraphicsScene(this);
     waveformView->setScene(waveformScene);
-    waveformView->setFixedHeight(150);
+    //waveformView->setFixedHeight(150);
+    waveformView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    mainLayout->addWidget(waveformView, 3);
 
     // Envelope
     grainEnvelopeLabel = new QLabel("Grain Envelope:", this);
@@ -30,8 +33,9 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainEnvelopeView = new QGraphicsView(this);
     grainEnvelopeScene = new QGraphicsScene(this);
     grainEnvelopeView->setScene(grainEnvelopeScene);
-    grainEnvelopeView->setFixedHeight(100);
-    mainLayout->addWidget(grainEnvelopeView);
+    //grainEnvelopeView->setFixedHeight(100);
+    grainEnvelopeView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    mainLayout->addWidget(grainEnvelopeView, 1);
     
     // Sliders
     QHBoxLayout *sliderLayout = new QHBoxLayout();
@@ -74,7 +78,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     mainLayout->addWidget(playButton);
 
     stopButton = new QPushButton("Stop Audio", this);
-    connect(playButton, &QPushButton::clicked, this, &SynthUI::onStopAudioClicked);
+    connect(stopButton, &QPushButton::clicked, this, &SynthUI::onStopAudioClicked);
     mainLayout->addWidget(stopButton);
 
     setLayout(mainLayout);
@@ -107,6 +111,7 @@ void SynthUI::onLoadFileClicked() {
 }
 
 void SynthUI::onGrainStartChanged(int value) {
+    grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
     size_t duration = grainDurationSlider->value();
     float overlap = overlapSlider->value() / 10.0f;
@@ -122,7 +127,8 @@ void SynthUI::onGrainStartChanged(int value) {
 }
 
 void SynthUI::onGrainDurationChanged(int value) {
-    size_t start = grainDurationSlider->value() / 100.0f;
+    grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
+    size_t start = grainStartSlider->value() / 100.0f;
     float duration = static_cast<float>(value);
     float overlap = overlapSlider->value() / 10.0f;
     float pitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
@@ -137,7 +143,8 @@ void SynthUI::onGrainDurationChanged(int value) {
 }
 
 void SynthUI::onGrainPitchChanged(int value) {
-    size_t start = grainDurationSlider->value() / 100.0f;
+    grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
+    size_t start = grainStartSlider->value() / 100.0f;
     size_t duration = grainDurationSlider->value();
     float overlap = overlapSlider->value() / 10.0f;
     float pitch = static_cast<float>(value) / 10.0f;
@@ -152,7 +159,8 @@ void SynthUI::onGrainPitchChanged(int value) {
 }
 
 void SynthUI::onOverlapChanged(int value) {
-    size_t start = grainDurationSlider->value() / 100.0f;
+    overlapLabel->setText(QString("Overlap: %1").arg(value));
+    size_t start = grainStartSlider->value() / 100.0f;
     size_t duration = grainDurationSlider->value();
     float overlap = static_cast<float>(value) / 10.0f;
     float pitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
@@ -176,7 +184,7 @@ void SynthUI::onPlayAudioClicked() {
     }
 }
 
-void SynthUI::onStopClicked() {
+void SynthUI::onStopAudioClicked() {
     stop_scheduler(synthPtr);
     // Make a Rust function to stop the audio stream!
 }
@@ -235,7 +243,7 @@ void SynthUI::updateEnvelopeDisplay() {
 
         QPainterPath envPath;
         envPath.moveTo(0, height);
-        for (double x = 0; x = width; x++) {
+        for (double x = 0; x < width; x++) {
             size_t index = static_cast<size_t>(x * step);
             if (index >= envelope.size()) break;
 
@@ -251,4 +259,4 @@ void SynthUI::updateEnvelopeDisplay() {
     }
 }
 
-
+void SynthUI::drawGrainSelectionRect

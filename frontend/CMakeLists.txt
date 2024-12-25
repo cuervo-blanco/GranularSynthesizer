@@ -11,6 +11,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+
 find_library(RUST_LIB NAMES libbackend.dylib PATHS
     ${CMAKE_CURRENT_SOURCE_DIR}/../backend/target/release
     REQUIRED) 

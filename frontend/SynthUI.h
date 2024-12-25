@@ -1,6 +1,7 @@
 #ifndef SYNTHUI_H
 #define SYNTHUI_H
 
+#include <cstddef>
 #include <QWidget>
 #include <QPushButton>
 #include <QSlider>
@@ -8,8 +9,23 @@
 #include <QGraphicsView>
 #include <QFileDialog>
 #include <QGraphicsScene>
+#include <QMessageBox>
 
+#ifdef __cplusplus
 extern "C" {
+#endif
+
+    typedef struct GranularSynth GranularSynth;
+    typedef struct SourceArray {
+        const float* data;
+        size_t length;
+    } SourceArray;
+
+    typedef struct GrainEnvelope {
+        const float* data;
+        size_t length;
+    } GrainEnvelope;
+
     GranularSynth* create_synth();
     void destroy_synth(GranularSynth* ptr);
 
@@ -36,7 +52,9 @@ extern "C" {
 
     GrainEnvelope get_grain_envelope(GranularSynth* ptr);
     void free_grain_envelope(GrainEnvelope env);
-}
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 class SynthUI : public QWidget {
     Q_OBJECT
