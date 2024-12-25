@@ -227,7 +227,10 @@ impl GranularSynth {
 
     pub fn calculate_metro_time_in_ms(&self) -> f32 {
         let params = self.params.lock().unwrap();
-        (params.grain_duration as f32 / 2.0) / params.grain_overlap
+        let sr = params.specs.sample_rate as f32;
+        let grain_duration_seconds = params.grain_duration as f32 / sr;
+        let interval_ms = (grain_duration_seconds * 1000.0) / params.grain_overlap;
+        interval_ms
     }
 
     pub fn start_scheduler(&self) {

@@ -9,6 +9,7 @@
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     synthPtr = create_synth();
     enginePtr = create_audio_engine(synthPtr);
+    generate_grain_envelope(synthPtr, 2048);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
@@ -82,6 +83,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(stopButton, &QPushButton::clicked, this, &SynthUI::onStopAudioClicked);
     mainLayout->addWidget(stopButton);
 
+    updateEnvelopeDisplay();
     setLayout(mainLayout);
     setWindowTitle("Granular Synthesizer");
     
@@ -107,6 +109,7 @@ SynthUI::~SynthUI() {
 }
 
 void SynthUI::onLoadFileClicked() {
+    generate_grain_envelope(synthPtr, 2048);
     loadedFilePath = QFileDialog::getOpenFileName(
             this, "Open Audio File", "", "WAV Files (*.wav)"
     );
@@ -119,69 +122,28 @@ void SynthUI::onLoadFileClicked() {
 void SynthUI::onGrainStartChanged(int value) {
     grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
-    size_t duration = grainDurationSlider->value();
-    float overlap = overlapSlider->value() / 10.0f;
-    float pitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
-
-    set_params(synthPtr,
-            static_cast<size_t>(normalizedStart),
-            duration,
-            overlap,
-            pitch);
-    generate_grain_envelope(synthPtr, 2048);
+    set_grain_start(synthPtr, normalizedStart);
     updateWaveformDisplay();
-    updateEnvelopeDisplay();
 }
 
 void SynthUI::onGrainDurationChanged(int value) {
     grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
-    size_t start = grainStartSlider->value() / 100.0f;
     float duration = static_cast<float>(value);
-    float overlap = overlapSlider->value() / 10.0f;
-    float pitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
-
-    set_params(synthPtr,
-            static_cast<size_t>(start),
-            duration,
-            overlap,
-            pitch);
-    generate_grain_envelope(synthPtr, 2048);
+    set_grain_duration(synthPtr, duration);
     updateWaveformDisplay();
-    updateEnvelopeDisplay();
 }
 
 void SynthUI::onGrainPitchChanged(int value) {
     grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
-    size_t start = grainStartSlider->value() / 100.0f;
-    size_t duration = grainDurationSlider->value();
-    float overlap = overlapSlider->value() / 10.0f;
     float pitch = static_cast<float>(value) / 10.0f;
-
-    set_params(synthPtr,
-            static_cast<size_t>(start),
-            duration,
-            overlap,
-            pitch);
-    generate_grain_envelope(synthPtr, 2048);
+    set_grain_pitch(synthPtr, pitch);
     updateWaveformDisplay();
-    updateEnvelopeDisplay();
 }
-
 void SynthUI::onOverlapChanged(int value) {
     overlapLabel->setText(QString("Overlap: %1").arg(value));
-    size_t start = grainStartSlider->value() / 100.0f;
-    size_t duration = grainDurationSlider->value();
     float overlap = static_cast<float>(value) / 10.0f;
-    float pitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
-
-    set_params(synthPtr,
-            static_cast<size_t>(start),
-            duration,
-            overlap,
-            pitch);
-    generate_grain_envelope(synthPtr, 2048);
+    set_overlap(synthPtr, overlap);
     updateWaveformDisplay();
-    updateEnvelopeDisplay();
 }
 
 void SynthUI::onPlayAudioClicked() {

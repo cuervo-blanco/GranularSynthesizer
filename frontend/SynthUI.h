@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
     typedef struct GranularSynth GranularSynth;
+    typedef struct AudioEngine AudioEngine;
     typedef struct SourceArray {
         const float* data;
         size_t length;
@@ -31,7 +32,11 @@ extern "C" {
 
     int load_audio_from_file(GranularSynth* ptr, const char* file_path);
     void generate_grain_envelope(GranularSynth* ptr, size_t size);
-    int play_audio(GranularSynth* ptr);
+
+    AudioEngine* create_audio_engine(GranularSynth* ptr);
+    int audio_engine_start(AudioEngine* ptr);
+    void audio_engine_stop(AudioEngine* ptr);
+    void destroy_audio_engine(AudioEngine* ptr);
 
     void start_scheduler(GranularSynth* ptr);
     void stop_scheduler(GranularSynth* ptr);
@@ -76,6 +81,7 @@ private slots:
 
 private:
     GranularSynth* synthPtr = nullptr;
+    AudioEngine* enginePtr = nullptr;
 
     QLabel *waveformLabel;
     QGraphicsView *waveformView;
