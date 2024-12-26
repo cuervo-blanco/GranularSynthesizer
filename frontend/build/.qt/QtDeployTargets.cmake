@@ -1,2 +1,0 @@
-set(__QT_DEPLOY_TARGET_QtRustSynth_FILE /Users/astro/Documents/AudioDev/qt_rust_synth/frontend/build/QtRustSynth)
-set(__QT_DEPLOY_TARGET_QtRustSynth_TYPE EXECUTABLE)
