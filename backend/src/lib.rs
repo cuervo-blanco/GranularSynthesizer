@@ -77,7 +77,7 @@ impl GrainVoice {
             // let env_index = env_index_float.floor() as usize;
             // Later do linear interpolation for a smoother read
             let envelope_value = 
-                four_point_interpolation(grain_env, env_index_float);
+                sinc_interpolation(grain_env, env_index_float);
             // ----------------------------
             // 2) Source read ramp
             // ----------------------------
@@ -85,7 +85,7 @@ impl GrainVoice {
             // starting from `base_source_start`.
             let source_index_float = base_source_start + (i as f32 * playback_rate);
             let source_value = 
-                four_point_interpolation(source_array, source_index_float);
+                sinc_interpolation(source_array, source_index_float);
             if i % 4410 == 0 {
                 println!("Index: {}", source_index_float);
                 println!("Interpolation: {}", source_value);
@@ -443,6 +443,70 @@ fn linear_interpolation(buffer: &[f32], x: f32) -> f32 {
     out
 }
 
+fn sinc(x: f32) -> f32 {
+    if x == 0.0 {
+        1.0
+    } else {
+        (x * std::f32::consts::PI).sin() / (x * std::f32::consts::PI)
+    }
+}
+
+#[allow(dead_code)]
+fn sinc_interpolation(buffer: &[f32], x: f32) -> f32 {
+    let n = buffer.len() as isize;
+    let i = x.floor() as isize;
+    let frac = x - i as f32;
+
+    let mut result = 0.0;
+    let mut normalization = 0.0;
+
+    for j in -2..=2 {
+        let index = i + j;
+        if index >= 0 && index < n {
+            let sample = buffer[index as usize];
+            let sinc_value = sinc(frac - j as f32);
+            result += sample * sinc_value;
+            normalization += sinc_value;
+        }
+    }
+
+    if normalization != 0.0 {
+        result / normalization
+    } else {
+        0.0 // Handle the case where normalization is zero
+    }
+}
+
+#[allow(dead_code)]
+fn cubic_interpolation(buffer: &[f32], x: f32) -> f32 {
+    let n = buffer.len() as isize;
+    let i = x.floor() as isize;
+    let frac = x - i as f32;
+
+    let mut p = [0.0; 4];
+
+    for j in -1..=2 {
+        let index = i + j;
+        if index >= 0 && index < n {
+            p[(j + 1) as usize] = buffer[index as usize];
+        } else {
+            p[(j + 1) as usize] = 0.0; // Out of bounds, use 0.0
+        }
+    }
+
+    let a = (p[2] - p[0]) * 0.5;
+    let b = p[1] - p[0] - a;
+    let c = p[2] - p[1] - a;
+    let d = p[1];
+
+    // Cubic polynomial: a * frac^3 + b * frac^2 + c * frac + d
+    let frac2 = frac * frac;
+    let frac3 = frac2 * frac;
+
+    a * frac3 + b * frac2 + c * frac + d
+}
+
+#[allow(dead_code)]
 fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
     if buffer.is_empty() {
         eprintln!("Buffer is empty [interpolation error]");
