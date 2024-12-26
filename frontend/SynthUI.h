@@ -10,6 +10,8 @@
 #include <QFileDialog>
 #include <QGraphicsScene>
 #include <QMessageBox>
+#include <QMenuBar>
+#include <QMenu>
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,6 +106,10 @@ private:
     QLabel *grainEnvelopeLabel;
     QGraphicsView *grainEnvelopeView;
     QGraphicsScene *grainEnvelopeScene;
+
+    QMenuBar *menuBar;
+    QMenu *fileMenu;
+    QAction *loadAction;
     
     QPushButton *loadFileButton;
     QPushButton *playButton;
@@ -134,6 +140,8 @@ private:
     void drawFullWaveformOnce();
     void updateGrainSelectionRect();
     void resizeEvent(QResizeEvent* event);
+
+    bool isPlaying;
 };
 
 #endif // SYNTHUI_H

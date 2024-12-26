@@ -7,6 +7,7 @@
 
 // Constructor
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
+    isPlaying = false;
     synthPtr = create_synth();
     enginePtr = create_audio_engine(synthPtr);
     generate_grain_envelope(synthPtr, 2048);
@@ -16,6 +17,12 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     loadFileButton = new QPushButton("Load Audio File", this);
     connect(loadFileButton, &QPushButton::clicked, this, &SynthUI::onLoadFileClicked);
     mainLayout->addWidget(loadFileButton);
+
+    QMenuBar *menuBar = new QMenuBar(nullptr);
+    QMenu *fileMenu = menuBar->addMenu("File");
+    QAction *loadAction = new QAction("Load", this);
+    fileMenu->addAction(loadAction);
+    connect(loadAction, &QAction::triggered, this, &SynthUI::onLoadFileClicked);
 
     // Waveform 
     waveformLabel = new QLabel("Audio Waveform:", this);
@@ -47,6 +54,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     //grainEnvelopeView->setFixedHeight(100);
     grainEnvelopeView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(grainEnvelopeView, 1);
+
     
     // Sliders
     QHBoxLayout *sliderLayout = new QHBoxLayout();
@@ -58,6 +66,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(grainStartSlider, &QSlider::valueChanged, this, &SynthUI::onGrainStartValueChanged);
     sliderLayout->addWidget(grainStartLabel);
     sliderLayout->addWidget(grainStartSlider);
+    grainStartSlider->setEnabled(false); 
 
     grainDurationLabel = new QLabel("Grain Duration", this);
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
@@ -67,6 +76,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
     sliderLayout->addWidget(grainDurationLabel);
     sliderLayout->addWidget(grainDurationSlider);
+    grainDurationSlider->setEnabled(false); 
 
     grainPitchLabel = new QLabel("Grain Pitch", this);
     grainPitchSlider = new QSlider(Qt::Horizontal, this);
@@ -76,6 +86,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(grainPitchSlider, &QSlider::valueChanged, this, &SynthUI::onGrainPitchValueChanged);
     sliderLayout->addWidget(grainPitchLabel);
     sliderLayout->addWidget(grainPitchSlider);
+    grainPitchSlider->setEnabled(false); 
 
     overlapLabel = new QLabel("Overlap", this);
     overlapSlider = new QSlider(Qt::Horizontal, this);
@@ -85,16 +96,20 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(overlapSlider, &QSlider::valueChanged, this, &SynthUI::onOverlapValueChanged);
     sliderLayout->addWidget(overlapLabel);
     sliderLayout->addWidget(overlapSlider);
+    overlapSlider->setEnabled(false); 
 
     mainLayout->addLayout(sliderLayout);
+
 
     // Buttons
     playButton = new QPushButton("Play Audio", this);
     connect(playButton, &QPushButton::clicked, this, &SynthUI::onPlayAudioClicked);
+    playButton->setEnabled(false); 
     mainLayout->addWidget(playButton);
 
     stopButton = new QPushButton("Stop Audio", this);
     connect(stopButton, &QPushButton::clicked, this, &SynthUI::onStopAudioClicked);
+    stopButton->setEnabled(false); 
     mainLayout->addWidget(stopButton);
 
     updateEnvelopeDisplay();
@@ -126,14 +141,23 @@ SynthUI::~SynthUI() {
 }
 
 void SynthUI::onLoadFileClicked() {
-    generate_grain_envelope(synthPtr, 2048);
     loadedFilePath = QFileDialog::getOpenFileName(
             this, "Open Audio File", "", "WAV Files (*.wav)"
     );
+    // generate_grain_envelope(synthPtr, 2048);
+    grainStartSlider->setEnabled(true); 
+    grainDurationSlider->setEnabled(true); 
+    grainPitchSlider->setEnabled(true); 
+    overlapSlider->setEnabled(true); 
+
+    playButton->setEnabled(true); 
+    onStopAudioClicked();
+
     grainStartSlider->setValue(0);
     grainDurationSlider->setValue(100);
     grainPitchSlider->setValue(10);
     overlapSlider->setValue(20);
+
     set_params(synthPtr, 0, 4410, 2.0f, 1.0f);
 
     if (!loadedFilePath.isEmpty()) {
@@ -155,13 +179,15 @@ void SynthUI::onLoadFileClicked() {
         drawFullWaveformOnce();
         updateGrainSelectionRect();
     }
-
 }
 
 void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
+    if (isPlaying == true) {
+        onPlayAudioClicked();
+    }
     //updateGrainSelectionRect();
 }
 void SynthUI::onGrainStartValueChanged() {
@@ -178,6 +204,9 @@ void SynthUI::onGrainDurationReleased() {
     int value = grainDurationSlider->value();
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
+    if (isPlaying == true) {
+        onPlayAudioClicked();
+    }
     // updateGrainSelectionRect();
 }
 void SynthUI::onGrainDurationValueChanged() {
@@ -196,6 +225,9 @@ void SynthUI::onGrainPitchReleased() {
     float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
     set_grain_pitch(synthPtr, value);
     updateGrainSelectionRect();
+    if (isPlaying == true) {
+        onPlayAudioClicked();
+    }
 }
 void SynthUI::onGrainPitchValueChanged() {
     float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
@@ -211,6 +243,9 @@ void SynthUI::onOverlapReleased() {
     float overlap = static_cast<float>(value) / 10.0f;
     set_overlap(synthPtr, overlap);
     updateGrainSelectionRect();
+    if (isPlaying == true) {
+        onPlayAudioClicked();
+    }
 }
 void SynthUI::onOverlapValueChanged() {
     int value = overlapSlider->value();
@@ -225,6 +260,11 @@ void SynthUI::onPlayAudioClicked() {
     if (!enginePtr) {
         enginePtr = create_audio_engine(synthPtr);
     }
+    stopButton->setEnabled(true); 
+    playButton->setEnabled(false); 
+
+    isPlaying = true;
+
     start_scheduler(synthPtr);
     // re-create the stream if necessary or if the Rust code
     // can handle it automatically, just call start
@@ -237,6 +277,9 @@ void SynthUI::onPlayAudioClicked() {
 }
 
 void SynthUI::onStopAudioClicked() {
+    isPlaying = false;
+    stopButton->setEnabled(false); 
+    playButton->setEnabled(true); 
     stop_scheduler(synthPtr);
     audio_engine_stop(enginePtr);
     destroy_audio_engine(enginePtr);
