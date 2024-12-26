@@ -73,9 +73,13 @@ public:
 private slots:
     void onLoadFileClicked();
     void onGrainStartReleased();
+    void onGrainStartValueChanged();
     void onGrainDurationReleased();
+    void onGrainDurationValueChanged();
     void onGrainPitchReleased();
+    void onGrainPitchValueChanged();
     void onOverlapReleased();
+    void onOverlapValueChanged();
     void onPlayAudioClicked();
     void onStopAudioClicked();
 

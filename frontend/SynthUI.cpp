@@ -55,6 +55,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainStartSlider = new QSlider(Qt::Horizontal, this);
     grainStartSlider->setRange(0,100);
     connect(grainStartSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainStartReleased);
+    connect(grainStartSlider, &QSlider::valueChanged, this, &SynthUI::onGrainStartValueChanged);
     sliderLayout->addWidget(grainStartLabel);
     sliderLayout->addWidget(grainStartSlider);
 
@@ -62,6 +63,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
     grainDurationSlider->setRange(100, 10000);
     connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
+    connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
     sliderLayout->addWidget(grainDurationLabel);
     sliderLayout->addWidget(grainDurationSlider);
 
@@ -70,6 +72,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainPitchSlider->setRange(1, 20);
     grainPitchSlider->setValue(10);
     connect(grainPitchSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainPitchReleased);
+    connect(grainPitchSlider, &QSlider::valueChanged, this, &SynthUI::onGrainPitchValueChanged);
     sliderLayout->addWidget(grainPitchLabel);
     sliderLayout->addWidget(grainPitchSlider);
 
@@ -78,6 +81,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     overlapSlider->setRange(10, 20);
     overlapSlider->setValue(20);
     connect(overlapSlider, &QSlider::sliderReleased, this, &SynthUI::onOverlapReleased);
+    connect(overlapSlider, &QSlider::valueChanged, this, &SynthUI::onGrainOverlapValueChanged);
     sliderLayout->addWidget(overlapLabel);
     sliderLayout->addWidget(overlapSlider);
 
@@ -145,33 +149,46 @@ void SynthUI::onLoadFileClicked() {
 
 void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
-    grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
     updateGrainSelectionRect();
 }
+void SynthUI::onGrainStartValueChanged() {
+    int value = grainStartSlider->value();
+    grainStartLabel->setText(QString("Grain Start: %1").arg(value));
+}
 
 void SynthUI::onGrainDurationReleased() {
     int value = grainDurationSlider->value();
-    grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
     updateGrainSelectionRect();
 }
+void SynthUI::onGrainDurationValueChanged() {
+    int value = grainDurationSlider->value();
+    grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
+}
 
 void SynthUI::onGrainPitchReleased() {
     int value = grainPitchSlider->value();
-    grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
     float pitch = static_cast<float>(value) / 10.0f;
     set_grain_pitch(synthPtr, pitch);
     updateGrainSelectionRect();
 }
+void SynthUI::onGrainPitchValueChanged() {
+    int value = grainPitchSlider->value();
+    grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
+}
+
 void SynthUI::onOverlapReleased() {
     int value = overlapSlider->value();
-    overlapLabel->setText(QString("Overlap: %1").arg(value));
     float overlap = static_cast<float>(value) / 10.0f;
     set_overlap(synthPtr, overlap);
     updateGrainSelectionRect();
+}
+void SynthUI::onOverlapValueChanged() {
+    int value = overlapSlider->value();
+    overlapLabel->setText(QString("Overlap: %1").arg(value));
 }
 
 void SynthUI::onPlayAudioClicked() {
