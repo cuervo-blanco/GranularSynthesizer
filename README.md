@@ -1,17 +1,37 @@
-# SynthApp README
+# GranularSynth
 
 ## NAME
-**SynthApp** – A granular audio synthesizer designed for real-time experimentation and manipulation of audio files.
+**GranularSynth** – A granular audio synthesizer designed for real-time 
+experimentation and manipulation of audio files.
 
 ## SYNOPSIS
-`SynthApp` is an evolving project aimed at providing an intuitive interface for granular synthesis. Currently, the app supports basic audio file loading, waveform visualization, and parameter adjustments. However, it remains under development, with various backend and frontend features requiring refinement.
+`SynthApp` is an evolving project aimed at providing an intuitive interface 
+for granular synthesis. Currently, the app supports basic audio file loading, 
+waveform visualization, and parameter adjustments. However, it remains under 
+development, with various backend and frontend features requiring refinement.
+In the future we hope to make it a plugin to be used during production.
 
 ## DESCRIPTION
 SynthApp is built with a two-part structure:
 - **Backend**: Developed in Rust, handling audio synthesis and real-time processing.
 - **Frontend**: Written in C++ (Qt framework), providing an interactive graphical interface.
 
-The app enables users to experiment with granular synthesis through parameterized controls like grain start, duration, pitch, and overlap, displayed in a dynamically updating UI.
+The app enables users to experiment with granular synthesis through parameterized 
+controls like grain start, duration, pitch, and overlap, displayed in a 
+dynamically updating UI. 
+
+This code is highly inspired by Andy Farnell's
+Designing Sound book's chapter:
+[Grain Techniques](https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/chapter21.html)
+
+I highly recommend reading this if you want to understand the goal of this
+application.
+
+You may ask : why a Rust backend and a C++ frontend? Why not all in JUCE?
+To which I answer: Where’s the spice? Where’s the drama? JUCE? Too mainstream, too predictable.
+All jokes aside, JUCE could have saved me a lot of headaches, but I wanted 
+to explore a different way of writing software through a hybrid approach.
+
 
 ## FEATURES
 ### **Current Functionality**
@@ -109,4 +129,4 @@ Contributions are welcome! Please:
 MIT License. See `LICENSE` file for details.
 
 ## AUTHORS
-- SynthApp Development Team
+cuervo-blanco (Jaime Osvaldo)
