@@ -61,10 +61,10 @@ impl GrainVoice {
             (grain_params.specs.sample_rate, grain_params.specs.channels);
         let duration_in_samples =
             (self.mydur * grain_params.grain_duration as f32) / 1000.0 * sample_rate as f32;
-
-        let mut output = vec![0.0; duration_in_samples as usize];
         let base_source_start = grain_params.grain_start as f32 + self.mystart;
         let playback_rate = self.mypitch * grain_params.grain_pitch;
+        // let total_duration_samples = duration_in_samples / playback_rate;
+        let mut output = vec![0.0; duration_in_samples as usize];
 
         for i in 0..duration_in_samples as usize {
             // ----------------------------
@@ -86,6 +86,10 @@ impl GrainVoice {
             let source_index_float = base_source_start + (i as f32 * playback_rate);
             let source_value = 
                 four_point_interpolation(source_array, source_index_float);
+            if i % 4410 == 0 {
+                println!("Index: {}", source_index_float);
+                println!("Interpolation: {}", source_value);
+            }
             
             output[i] = source_value * envelope_value;
         }
@@ -314,7 +318,7 @@ impl GranularSynth {
         let params = self.params.lock().unwrap();
         let grain_data = voices[*counter]
             .process_grain(source_array, grain_env, &params);
-        eprintln!("Grain data length = {}", grain_data.len());
+        //eprintln!("Grain data length = {}", grain_data.len());
 
         self.grain_sender.send(grain_data).ok();
     }
@@ -441,9 +445,9 @@ fn linear_interpolation(buffer: &[f32], x: f32) -> f32 {
 
 fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
     if buffer.is_empty() {
+        eprintln!("Buffer is empty [interpolation error]");
         return 0.0;
     }
-
     let i = x.floor() as isize;
     let frac = x - (i as f32);
 
@@ -645,7 +649,7 @@ pub extern "C" fn set_grain_pitch(
         &*synth_ptr
     };
     let mut params = synth.params.lock().unwrap();
-    params.grain_pitch = pitch.clamp(0.1, 2.0) as f32 * params.specs.sample_rate as f32;
+    params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
 }
 
 #[no_mangle]

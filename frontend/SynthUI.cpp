@@ -193,14 +193,13 @@ void SynthUI::onGrainDurationValueChanged() {
 }
 
 void SynthUI::onGrainPitchReleased() {
-    int value = grainPitchSlider->value();
-    float pitch = static_cast<float>(value) / 10.0f;
-    set_grain_pitch(synthPtr, pitch);
+    float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    set_grain_pitch(synthPtr, value);
     updateGrainSelectionRect();
 }
 void SynthUI::onGrainPitchValueChanged() {
-    int value = grainPitchSlider->value();
-    if (value < 10) {
+    float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    if (value < 1) {
         grainPitchLabel->setText(QString("Grain Pitch:  %1").arg(value));
     } else {
         grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
