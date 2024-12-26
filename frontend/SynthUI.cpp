@@ -61,8 +61,8 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     grainDurationLabel = new QLabel("Grain Duration", this);
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
-    grainDurationSlider->setRange(100, 10000);
-    grainDurationSlider->setValue(500);
+    grainDurationSlider->setRange(1, 200);
+    grainDurationSlider->setValue(100);
     connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
     connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
     sliderLayout->addWidget(grainDurationLabel);
@@ -131,15 +131,22 @@ void SynthUI::onLoadFileClicked() {
             this, "Open Audio File", "", "WAV Files (*.wav)"
     );
     grainStartSlider->setValue(0);
-    grainDurationSlider->setValue(1000);  // or whatever default
-    grainPitchSlider->setValue(10);      // i.e. pitch=1.0
-    overlapSlider->setValue(20);         // i.e. overlap=2.0
+    grainDurationSlider->setValue(100);
+    grainPitchSlider->setValue(10);
+    overlapSlider->setValue(20);
     set_params(synthPtr, 0, 4410, 2.0f, 1.0f);
 
     if (!loadedFilePath.isEmpty()) {
         load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
         SourceArray array = get_source_array(synthPtr);
-        std::vector<float> fullSamples(array.length);
+        float arrayLength = array.length;
+        std::vector<float> fullSamples(arrayLength);
+        // int sampleRate = get_sample_rate(synthPtr);
+        // int channels = get_total_channels(synthPtr);
+        // int totalMilliseconds = ((arrayLength / channels) / sampleRate) * 1000;
+        // grainDurationSlider->setRange(100, totalMilliseconds);
+        // grainDurationSlider->setValue(totalMilliseconds / 2 + 100);
+
         for (size_t i = 0; i < array.length; ++i) {
             fullSamples[i] = array.data[i];
         }
@@ -155,7 +162,7 @@ void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
-    updateGrainSelectionRect();
+    //updateGrainSelectionRect();
 }
 void SynthUI::onGrainStartValueChanged() {
     int value = grainStartSlider->value();
@@ -164,13 +171,14 @@ void SynthUI::onGrainStartValueChanged() {
     } else {
         grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     }
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainDurationReleased() {
     int value = grainDurationSlider->value();
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
-    updateGrainSelectionRect();
+    // updateGrainSelectionRect();
 }
 void SynthUI::onGrainDurationValueChanged() {
     int value = grainDurationSlider->value();
@@ -181,6 +189,7 @@ void SynthUI::onGrainDurationValueChanged() {
     } else {
         grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
     }
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainPitchReleased() {
@@ -231,9 +240,8 @@ void SynthUI::onPlayAudioClicked() {
 void SynthUI::onStopAudioClicked() {
     stop_scheduler(synthPtr);
     audio_engine_stop(enginePtr);
-    // Possibly also destroy the engine?
-    // destroy_audio_engine(enginePtr);
-    // enginePtr = nullptr;
+    destroy_audio_engine(enginePtr);
+    enginePtr = nullptr;
 }
 
 void SynthUI::drawFullWaveformOnce(){
@@ -282,7 +290,8 @@ void SynthUI::updateGrainSelectionRect()
     double fractionStart = static_cast<double>(grainStartSlider->value()) / 100.0;
     // grainDurationSlider is, say, 100..10000 => treat it as a # of samples?
     // We'll interpret it as "grainDuration" samples, so fractionDur = grainDuration / totalSamples
-    double grainDurationSamples = static_cast<double>(grainDurationSlider->value());
+    int sample_rate = get_sample_rate(synthPtr);
+    double grainDurationSamples = static_cast<double>(grainDurationSlider->value() / 1000 ) * sample_rate;
     double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
 
     // clamp fractionDur so it can't exceed the total
@@ -343,9 +352,10 @@ void SynthUI::drawGrainSelectionRect(
         size_t grainDuration,
         size_t totalSamples
     ) {
+    int sample_rate = get_sample_rate(synthPtr);
     double startX = (grainStartSample / (double)totalSamples) * sceneWidth;
     double endX = 
-        ((grainStartSample + grainDuration) / (double)totalSamples) * sceneWidth;
+        (((grainStartSample + grainDuration) / 1000) * sample_rate / (double)totalSamples) * sceneWidth;
 
     startX = qBound(0.0, startX, sceneWidth);
     endX = qBound(0.0, endX, sceneWidth);

@@ -57,6 +57,10 @@ extern "C" {
 
     GrainEnvelope get_grain_envelope(GranularSynth* ptr);
     void free_grain_envelope(GrainEnvelope env);
+
+    int get_sample_rate(GranularSynth* ptr);
+    int get_total_channels(GranularSynth* ptr);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

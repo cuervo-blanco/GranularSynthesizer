@@ -57,14 +57,16 @@ impl GrainVoice {
         grain_params: &GrainParams,
     ) -> Vec<f32> {
         // How many samples in this grain?
+        let (sample_rate, _channels) = 
+            (grain_params.specs.sample_rate, grain_params.specs.channels);
         let duration_in_samples =
-            (self.mydur * grain_params.grain_duration as f32) as usize;
+            (self.mydur * grain_params.grain_duration as f32) / 1000.0 * sample_rate as f32;
 
-        let mut output = vec![0.0; duration_in_samples];
+        let mut output = vec![0.0; duration_in_samples as usize];
         let base_source_start = grain_params.grain_start as f32 + self.mystart;
         let playback_rate = self.mypitch * grain_params.grain_pitch;
 
-        for i in 0..duration_in_samples {
+        for i in 0..duration_in_samples as usize {
             // ----------------------------
             // 1) Envelope ramp
             // ----------------------------
@@ -478,6 +480,26 @@ use std::ptr;
 pub extern "C" fn create_synth() -> *mut GranularSynth {
     let synth = Box::new(GranularSynth::new());
     Box::into_raw(synth)
+}
+
+#[no_mangle]
+pub extern "C" fn get_sample_rate(synth_ptr: *mut GranularSynth) -> u32 {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    let params = synth.params.lock().unwrap();
+    params.specs.sample_rate
+}
+
+#[no_mangle]
+pub extern "C" fn get_total_channels(synth_ptr: *mut GranularSynth) -> u16 {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    let params = synth.params.lock().unwrap();
+    params.specs.channels
 }
 
 #[no_mangle]
