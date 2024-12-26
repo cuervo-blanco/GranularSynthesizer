@@ -69,7 +69,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainPitchSlider = new QSlider(Qt::Horizontal, this);
     grainPitchSlider->setRange(1, 20);
     grainPitchSlider->setValue(10);
-    connect(grainPitchSlider, &QSlider::valueReleased, this, &SynthUI::onGrainPitchReleased);
+    connect(grainPitchSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainPitchReleased);
     sliderLayout->addWidget(grainPitchLabel);
     sliderLayout->addWidget(grainPitchSlider);
 
@@ -77,7 +77,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     overlapSlider = new QSlider(Qt::Horizontal, this);
     overlapSlider->setRange(10, 20);
     overlapSlider->setValue(20);
-    connect(overlapSlider, &QSlider::valueReleased, this, &SynthUI::onOverlapReleased);
+    connect(overlapSlider, &QSlider::sliderReleased, this, &SynthUI::onOverlapReleased);
     sliderLayout->addWidget(overlapLabel);
     sliderLayout->addWidget(overlapSlider);
 
@@ -143,27 +143,31 @@ void SynthUI::onLoadFileClicked() {
 
 }
 
-void SynthUI::onGrainStartReleased(int value) {
+void SynthUI::onGrainStartReleased() {
+    int value = grainStartSlider->value();
     grainStartLabel->setText(QString("Grain Start: %1").arg(value));
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
     updateGrainSelectionRect();
 }
 
-void SynthUI::onGrainDurationReleased(int value) {
+void SynthUI::onGrainDurationReleased() {
+    int value = grainDurationSlider->value();
     grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
     float duration = static_cast<float>(value);
     set_grain_duration(synthPtr, duration);
     updateGrainSelectionRect();
 }
 
-void SynthUI::onGrainPitchReleased(int value) {
+void SynthUI::onGrainPitchReleased() {
+    int value = grainPitchSlider->value();
     grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
     float pitch = static_cast<float>(value) / 10.0f;
     set_grain_pitch(synthPtr, pitch);
     updateGrainSelectionRect();
 }
-void SynthUI::onOverlapReleased(int value) {
+void SynthUI::onOverlapReleased() {
+    int value = overlapSlider->value();
     overlapLabel->setText(QString("Overlap: %1").arg(value));
     float overlap = static_cast<float>(value) / 10.0f;
     set_overlap(synthPtr, overlap);

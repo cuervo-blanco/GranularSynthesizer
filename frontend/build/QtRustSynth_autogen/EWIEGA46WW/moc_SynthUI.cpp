@@ -41,11 +41,10 @@ static constexpr auto qt_meta_stringdata_ZN7SynthUIE = QtMocHelpers::stringData(
     "SynthUI",
     "onLoadFileClicked",
     "",
-    "onGrainStartChanged",
-    "value",
-    "onGrainDurationChanged",
-    "onGrainPitchChanged",
-    "onOverlapChanged",
+    "onGrainStartReleased",
+    "onGrainDurationReleased",
+    "onGrainPitchReleased",
+    "onOverlapReleased",
     "onPlayAudioClicked",
     "onStopAudioClicked"
 );
@@ -68,19 +67,19 @@ Q_CONSTINIT static const uint qt_meta_data_ZN7SynthUIE[] = {
 
  // slots: name, argc, parameters, tag, flags, initial metatype offsets
        1,    0,   56,    2, 0x08,    1 /* Private */,
-       3,    1,   57,    2, 0x08,    2 /* Private */,
-       5,    1,   60,    2, 0x08,    4 /* Private */,
-       6,    1,   63,    2, 0x08,    6 /* Private */,
-       7,    1,   66,    2, 0x08,    8 /* Private */,
-       8,    0,   69,    2, 0x08,   10 /* Private */,
-       9,    0,   70,    2, 0x08,   11 /* Private */,
+       3,    0,   57,    2, 0x08,    2 /* Private */,
+       4,    0,   58,    2, 0x08,    3 /* Private */,
+       5,    0,   59,    2, 0x08,    4 /* Private */,
+       6,    0,   60,    2, 0x08,    5 /* Private */,
+       7,    0,   61,    2, 0x08,    6 /* Private */,
+       8,    0,   62,    2, 0x08,    7 /* Private */,
 
  // slots: parameters
     QMetaType::Void,
-    QMetaType::Void, QMetaType::Int,    4,
-    QMetaType::Void, QMetaType::Int,    4,
-    QMetaType::Void, QMetaType::Int,    4,
-    QMetaType::Void, QMetaType::Int,    4,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
+    QMetaType::Void,
     QMetaType::Void,
     QMetaType::Void,
 
@@ -98,18 +97,14 @@ Q_CONSTINIT const QMetaObject SynthUI::staticMetaObject = { {
         QtPrivate::TypeAndForceComplete<SynthUI, std::true_type>,
         // method 'onLoadFileClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        // method 'onGrainStartChanged'
+        // method 'onGrainStartReleased'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<int, std::false_type>,
-        // method 'onGrainDurationChanged'
+        // method 'onGrainDurationReleased'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<int, std::false_type>,
-        // method 'onGrainPitchChanged'
+        // method 'onGrainPitchReleased'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<int, std::false_type>,
-        // method 'onOverlapChanged'
+        // method 'onOverlapReleased'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
-        QtPrivate::TypeAndForceComplete<int, std::false_type>,
         // method 'onPlayAudioClicked'
         QtPrivate::TypeAndForceComplete<void, std::false_type>,
         // method 'onStopAudioClicked'
@@ -124,15 +119,16 @@ void SynthUI::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, voi
     if (_c == QMetaObject::InvokeMetaMethod) {
         switch (_id) {
         case 0: _t->onLoadFileClicked(); break;
-        case 1: _t->onGrainStartChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
-        case 2: _t->onGrainDurationChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
-        case 3: _t->onGrainPitchChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
-        case 4: _t->onOverlapChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
+        case 1: _t->onGrainStartReleased(); break;
+        case 2: _t->onGrainDurationReleased(); break;
+        case 3: _t->onGrainPitchReleased(); break;
+        case 4: _t->onOverlapReleased(); break;
         case 5: _t->onPlayAudioClicked(); break;
         case 6: _t->onStopAudioClicked(); break;
         default: ;
         }
     }
+    (void)_a;
 }
 
 const QMetaObject *SynthUI::metaObject() const

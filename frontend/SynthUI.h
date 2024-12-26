@@ -72,10 +72,10 @@ public:
 
 private slots:
     void onLoadFileClicked();
-    void onGrainStartChanged(int value);
-    void onGrainDurationChanged(int value);
-    void onGrainPitchChanged(int value);
-    void onOverlapChanged(int value);
+    void onGrainStartReleased();
+    void onGrainDurationReleased();
+    void onGrainPitchReleased();
+    void onOverlapReleased();
     void onPlayAudioClicked();
     void onStopAudioClicked();
 
@@ -125,6 +125,7 @@ private:
     );
     void drawFullWaveformOnce();
     void updateGrainSelectionRect();
+    void resizeEvent(QResizeEvent* event);
 };
 
 #endif // SYNTHUI_H
