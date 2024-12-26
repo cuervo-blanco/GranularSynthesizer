@@ -78,7 +78,6 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     sliderLayout->addWidget(grainPitchSlider);
 
     overlapLabel = new QLabel("Overlap", this);
-    onOverlapValueChanged();
     overlapSlider = new QSlider(Qt::Horizontal, this);
     overlapSlider->setRange(10, 20);
     overlapSlider->setValue(20);
@@ -101,6 +100,10 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     updateEnvelopeDisplay();
     setLayout(mainLayout);
     setWindowTitle("Granular Synthesizer");
+    onGrainStartValueChanged();
+    onGrainDurationValueChanged();
+    onGrainPitchValueChanged();
+    onOverlapValueChanged();
 }
 
 // Destructor
