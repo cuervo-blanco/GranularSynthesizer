@@ -49,7 +49,7 @@ extern "C" {
             size_t duration, 
             float overlap, 
             float pitch);
-    void set_grain_start(GranularSynth* ptr, size_t start);
+    void set_grain_start(GranularSynth* ptr, float start);
     void set_grain_duration(GranularSynth* ptr, size_t duration);
     void set_grain_pitch(GranularSynth* ptr, float pitch);
     void set_overlap(GranularSynth* ptr, float overlap);

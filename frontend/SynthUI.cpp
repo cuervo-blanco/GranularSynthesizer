@@ -18,11 +18,12 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(loadFileButton, &QPushButton::clicked, this, &SynthUI::onLoadFileClicked);
     mainLayout->addWidget(loadFileButton);
 
-    QMenuBar *menuBar = new QMenuBar(nullptr);
+    QMenuBar *menuBar = new QMenuBar(this);
     QMenu *fileMenu = menuBar->addMenu("File");
     QAction *loadAction = new QAction("Load", this);
     fileMenu->addAction(loadAction);
     connect(loadAction, &QAction::triggered, this, &SynthUI::onLoadFileClicked);
+    mainLayout->setMenuBar(menuBar);
 
     // Waveform 
     waveformLabel = new QLabel("Audio Waveform:", this);
@@ -70,7 +71,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     grainDurationLabel = new QLabel("Grain Duration", this);
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
-    grainDurationSlider->setRange(1, 200);
+    grainDurationSlider->setRange(50, 200);
     grainDurationSlider->setValue(100);
     connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
     connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
@@ -132,18 +133,13 @@ SynthUI::~SynthUI() {
         destroy_synth(synthPtr);
         synthPtr = nullptr;
     }
-
-    delete grainEnvelopeScene;
-    delete grainEnvelopeView;
-    delete grainPitchSlider;
-    delete overlapLabel;
-    delete playButton;
 }
 
 void SynthUI::onLoadFileClicked() {
     loadedFilePath = QFileDialog::getOpenFileName(
             this, "Open Audio File", "", "WAV Files (*.wav)"
     );
+    //onStopAudioClicked();
     // generate_grain_envelope(synthPtr, 2048);
     grainStartSlider->setEnabled(true); 
     grainDurationSlider->setEnabled(true); 
@@ -151,16 +147,17 @@ void SynthUI::onLoadFileClicked() {
     overlapSlider->setEnabled(true); 
 
     playButton->setEnabled(true); 
-    onStopAudioClicked();
 
     grainStartSlider->setValue(0);
     grainDurationSlider->setValue(100);
     grainPitchSlider->setValue(10);
     overlapSlider->setValue(20);
 
-    set_params(synthPtr, 0, 4410, 2.0f, 1.0f);
-
     if (!loadedFilePath.isEmpty()) {
+        if (!synthPtr) {
+            // Do something?
+            return;
+        }
         load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
         SourceArray array = get_source_array(synthPtr);
         float arrayLength = array.length;
@@ -184,6 +181,10 @@ void SynthUI::onLoadFileClicked() {
 void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
+    if (!synthPtr) {
+        // Do something?
+        return;
+    }
     set_grain_start(synthPtr, normalizedStart);
     if (isPlaying == true) {
         onPlayAudioClicked();
@@ -201,8 +202,11 @@ void SynthUI::onGrainStartValueChanged() {
 }
 
 void SynthUI::onGrainDurationReleased() {
-    int value = grainDurationSlider->value();
-    float duration = static_cast<float>(value);
+    int duration = grainDurationSlider->value();
+    if (!synthPtr) {
+        // Do something?
+        return;
+    }
     set_grain_duration(synthPtr, duration);
     if (isPlaying == true) {
         onPlayAudioClicked();
@@ -223,6 +227,10 @@ void SynthUI::onGrainDurationValueChanged() {
 
 void SynthUI::onGrainPitchReleased() {
     float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    if (!synthPtr) {
+        // Do something?
+        return;
+    }
     set_grain_pitch(synthPtr, value);
     updateGrainSelectionRect();
     if (isPlaying == true) {
@@ -241,6 +249,10 @@ void SynthUI::onGrainPitchValueChanged() {
 void SynthUI::onOverlapReleased() {
     int value = overlapSlider->value();
     float overlap = static_cast<float>(value) / 10.0f;
+    if (!synthPtr) {
+        // Do something?
+        return;
+    }
     set_overlap(synthPtr, overlap);
     updateGrainSelectionRect();
     if (isPlaying == true) {
@@ -257,13 +269,14 @@ void SynthUI::onOverlapValueChanged() {
 }
 
 void SynthUI::onPlayAudioClicked() {
+    if (!synthPtr) {
+        synthPtr = create_synth();
+    }
     if (!enginePtr) {
         enginePtr = create_audio_engine(synthPtr);
     }
     stopButton->setEnabled(true); 
     playButton->setEnabled(false); 
-
-    isPlaying = true;
 
     start_scheduler(synthPtr);
     // re-create the stream if necessary or if the Rust code
@@ -274,16 +287,38 @@ void SynthUI::onPlayAudioClicked() {
         QMessageBox::critical(this, "Audio Playback Error",
                               "Failed to start audio playback. Please check your audio device.");
     }
+
+    isPlaying = true;
+
+    float normalizedStart = static_cast<float>(grainStartSlider->value()) / 100.0f;
+    float normalizedPitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    float normalizedOverlap= static_cast<float>(overlapSlider->value()) / 10.0f;
+    
+    set_params(
+        synthPtr,
+        normalizedStart,
+        grainDurationSlider->value(),
+        normalizedOverlap,
+        normalizedPitch
+    );
 }
 
 void SynthUI::onStopAudioClicked() {
     isPlaying = false;
     stopButton->setEnabled(false); 
     playButton->setEnabled(true); 
+    if (!synthPtr) {
+        // Handle better?
+        audio_engine_stop(enginePtr);
+        return;
+    }
+
     stop_scheduler(synthPtr);
     audio_engine_stop(enginePtr);
-    destroy_audio_engine(enginePtr);
-    enginePtr = nullptr;
+    //destroy_audio_engine(enginePtr);
+    //destroy_synth(synthPtr);
+    //enginePtr = nullptr;
+    //synthPtr = nullptr;
 }
 
 void SynthUI::drawFullWaveformOnce(){
@@ -316,6 +351,10 @@ void SynthUI::drawFullWaveformOnce(){
 }
 void SynthUI::updateGrainSelectionRect()
 {
+    if (!synthPtr) {
+        m_grainRectItem->setRect(0,0,0,0);
+        return;
+    }
     SourceArray array = get_source_array(synthPtr);
     size_t totalSamples = array.length;
     free_source_array(array);
@@ -333,7 +372,7 @@ void SynthUI::updateGrainSelectionRect()
     // grainDurationSlider is, say, 100..10000 => treat it as a # of samples?
     // We'll interpret it as "grainDuration" samples, so fractionDur = grainDuration / totalSamples
     int sample_rate = get_sample_rate(synthPtr);
-    double grainDurationSamples = static_cast<double>(grainDurationSlider->value() / 1000 ) * sample_rate;
+    double grainDurationSamples = static_cast<double>(grainDurationSlider->value()) / 1000.0 * sample_rate;
     double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
 
     // clamp fractionDur so it can't exceed the total
@@ -355,7 +394,10 @@ void SynthUI::updateGrainSelectionRect()
 
 void SynthUI::updateEnvelopeDisplay() {
     grainEnvelopeScene->clear();
-
+    if (!synthPtr) {
+        grainEnvelopeScene->setSceneRect(0, 0, waveformView->width(), waveformView->height());
+        return;
+    }
     GrainEnvelope env = get_grain_envelope(synthPtr);
     std::vector<float> envelope(env.length);
     for (size_t i = 0; i < env.length; ++i) {
@@ -394,6 +436,9 @@ void SynthUI::drawGrainSelectionRect(
         size_t grainDuration,
         size_t totalSamples
     ) {
+    if (!synthPtr) {
+        return;
+    }
     int sample_rate = get_sample_rate(synthPtr);
     double startX = (grainStartSample / (double)totalSamples) * sceneWidth;
     double endX = 

@@ -24,7 +24,7 @@ pub struct Specs {
 }
 
 pub struct GrainParams {
-    pub grain_start: usize,
+    pub grain_start: f32,
     pub grain_duration: usize,
     pub grain_overlap: f32,
     pub grain_pitch: f32,
@@ -61,7 +61,7 @@ impl GrainVoice {
             (grain_params.specs.sample_rate, grain_params.specs.channels);
         let duration_in_samples =
             (self.mydur * grain_params.grain_duration as f32) / 1000.0 * sample_rate as f32;
-        let base_source_start = grain_params.grain_start as f32 + self.mystart;
+        let base_source_start = grain_params.grain_start + self.mystart;
         let playback_rate = self.mypitch * grain_params.grain_pitch;
         // let total_duration_samples = duration_in_samples / playback_rate;
         let mut output = vec![0.0; duration_in_samples as usize];
@@ -224,7 +224,7 @@ impl GranularSynth {
             grain_env: Arc::new(Mutex::new(vec![])),
             grain_voices: Arc::new(Mutex::new(grain_voices)),
             params: Arc::new(Mutex::new(GrainParams {
-                grain_start: 0,
+                grain_start: 0.0,
                 grain_duration: 4410,
                 grain_overlap: 2.0,
                 grain_pitch: 1.0,
@@ -346,7 +346,7 @@ impl GranularSynth {
                     "loaded audio: sample rate = {}, channels = {}",
                     spec.sample_rate, spec.channels
                 );
-
+                // Change bit rate
                 let samples: Vec<f32> = reader
                     .samples::<i16>()
                     .map(|s| s.unwrap_or(0) as f32 / 32768.0)
@@ -355,6 +355,7 @@ impl GranularSynth {
                 let filesize = samples.len();
                 let mut params = self.params.lock().unwrap();
                 params.specs.filesize = filesize;
+                // Resample? 
                 params.specs.sample_rate = spec.sample_rate;
                 params.specs.channels = spec.channels;
 
@@ -383,12 +384,12 @@ impl GranularSynth {
     }
     pub fn set_params(
         &self, 
-        start: usize, 
+        start: f32, 
         duration: usize, 
         overlap: f32,
         pitch: f32) {
         let mut params = self.params.lock().unwrap();
-        params.grain_start = (start.clamp(0, 1) as f32 * params.specs.filesize as f32) as usize;
+        params.grain_start = start.clamp(0.0, 1.0) as f32 * params.specs.filesize as f32;
         params.grain_duration = duration;
         params.grain_overlap = overlap.clamp(1.0, 2.0) as f32;
         params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
@@ -664,7 +665,7 @@ pub extern "C" fn generate_grain_envelope(
 #[no_mangle]
 pub extern "C" fn set_params(
     synth_ptr: *mut GranularSynth,
-    start: usize,
+    start: f32,
     duration: usize,
     overlap: f32,
     pitch: f32,
@@ -679,7 +680,7 @@ pub extern "C" fn set_params(
 #[no_mangle]
 pub extern "C" fn set_grain_start(
     synth_ptr: *mut GranularSynth, 
-    start: usize
+    start: f32
     ) {
     let synth = unsafe {
         assert!(!synth_ptr.is_null());
@@ -687,7 +688,7 @@ pub extern "C" fn set_grain_start(
     };
     let mut params = synth.params.lock().unwrap();
     params.grain_start = 
-        (start.clamp(0, 1) as f32 * params.specs.filesize as f32) as usize;
+        start.clamp(0.0, 1.0) as f32 * params.specs.filesize as f32;
 }
 
 #[no_mangle]
