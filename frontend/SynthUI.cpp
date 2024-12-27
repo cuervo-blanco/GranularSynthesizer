@@ -71,7 +71,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     grainDurationLabel = new QLabel("Grain Duration", this);
     grainDurationSlider = new QSlider(Qt::Horizontal, this);
-    grainDurationSlider->setRange(50, 200);
+    grainDurationSlider->setRange(50, 1000);
     grainDurationSlider->setValue(100);
     connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
     connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
@@ -92,7 +92,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     overlapLabel = new QLabel("Overlap", this);
     overlapSlider = new QSlider(Qt::Horizontal, this);
     overlapSlider->setRange(10, 20);
-    overlapSlider->setValue(20);
+    overlapSlider->setValue(15);
     connect(overlapSlider, &QSlider::sliderReleased, this, &SynthUI::onOverlapReleased);
     connect(overlapSlider, &QSlider::valueChanged, this, &SynthUI::onOverlapValueChanged);
     sliderLayout->addWidget(overlapLabel);
@@ -151,7 +151,7 @@ void SynthUI::onLoadFileClicked() {
     grainStartSlider->setValue(0);
     grainDurationSlider->setValue(100);
     grainPitchSlider->setValue(10);
-    overlapSlider->setValue(20);
+    overlapSlider->setValue(15);
 
     if (!loadedFilePath.isEmpty()) {
         if (!synthPtr) {
@@ -181,8 +181,7 @@ void SynthUI::onLoadFileClicked() {
 void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
-    if (!synthPtr) {
-        // Do something?
+    if (!synthPtr) {        // Do something?
         return;
     }
     set_grain_start(synthPtr, normalizedStart);
@@ -261,10 +260,11 @@ void SynthUI::onOverlapReleased() {
 }
 void SynthUI::onOverlapValueChanged() {
     int value = overlapSlider->value();
+    int overlap = value * 10 - 100;
     if (value < 10) {
-        overlapLabel->setText(QString("Overlap: %1").arg(value));
+        overlapLabel->setText(QString("Overlap: %1").arg(overlap));
     } else {
-        overlapLabel->setText(QString("Overlap: %1").arg(value));
+        overlapLabel->setText(QString("Overlap: %1").arg(overlap));
     }
 }
 

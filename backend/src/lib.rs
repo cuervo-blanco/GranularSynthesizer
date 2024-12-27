@@ -86,10 +86,10 @@ impl GrainVoice {
             let source_index_float = base_source_start + (i as f32 * playback_rate);
             let source_value = 
                 sinc_interpolation(source_array, source_index_float);
-            if i % 4410 == 0 {
-                println!("Index: {}", source_index_float);
-                println!("Interpolation: {}", source_value);
-            }
+            // if i % 4410 == 0 {
+                // println!("Index: {}", source_index_float);
+                // println!("Interpolation: {}", source_value);
+            // }
             
             output[i] = source_value * envelope_value;
         }
@@ -106,6 +106,11 @@ pub struct AudioEngine {
 }
 
 impl AudioEngine {
+    // Add a record function that takes the output from the stream (and two
+    // user defined sample_rate and bit_rate setting functions) and
+    // starts recording, then another function that stops recording and asks
+    // the user for output name
+    // Maybe also a way to choose the buffer size and other stuff like that.
     pub fn new(synth: Arc<GranularSynth>) -> Self {
         AudioEngine {
             synth,
@@ -119,6 +124,7 @@ impl AudioEngine {
             drop(existing);
         }
 
+        // Add Menu Option to Choose Output Device
         let host = cpal::default_host();
         let output_device = match host.default_output_device() {
             Some(device) => device,
@@ -204,6 +210,7 @@ pub struct GranularSynth {
     grain_receiver: Arc<Receiver<Vec<f32>>>,
 }
 impl GranularSynth {
+    // Maybe add a function to set the numbrt of grain_voices
     pub fn new() -> Self {
         let specs = Specs {
             sample_rate: 44100,
@@ -239,9 +246,7 @@ impl GranularSynth {
 
     pub fn calculate_metro_time_in_ms(&self) -> f32 {
         let params = self.params.lock().unwrap();
-        let sr = params.specs.sample_rate as f32;
-        let grain_duration_seconds = params.grain_duration as f32 / sr;
-        let interval_ms = (grain_duration_seconds * 1000.0) / params.grain_overlap;
+        let interval_ms = params.grain_duration as f32 / params.grain_overlap;
         interval_ms
     }
 
@@ -252,7 +257,7 @@ impl GranularSynth {
             let metro_time = synth_clone.calculate_metro_time_in_ms();
             let interval = Duration::from_millis(metro_time as u64);
             let mut next_time = Instant::now();
-
+            println!("synth_clone.should_stop: {:?}", synth_clone.should_stop);
             // mientras sea falso
             while !synth_clone.should_stop.load(Ordering::SeqCst) {
                 let now = Instant::now();
@@ -384,7 +389,7 @@ impl GranularSynth {
     }
     pub fn set_params(
         &self, 
-        start: f32, 
+        start: f32 ,
         duration: usize, 
         overlap: f32,
         pitch: f32) {

@@ -45,7 +45,7 @@ extern "C" {
 
     void set_params(
             GranularSynth* ptr, 
-            size_t start, 
+            float start, 
             size_t duration, 
             float overlap, 
             float pitch);
