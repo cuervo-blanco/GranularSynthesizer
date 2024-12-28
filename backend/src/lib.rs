@@ -42,6 +42,12 @@ pub struct GrainVoice {
     mystart: f32,
     mypitch: f32,
     mydur: f32,
+    interpolation: Interpolation
+}
+pub enum Interpolation {
+    FourPoint,
+    Sinc,
+    Cubic
 }
 
 impl GrainVoice {
@@ -50,6 +56,7 @@ impl GrainVoice {
             mystart,
             mypitch,
             mydur,
+            Interpolation::Sinc,
         }
     }
 
@@ -79,16 +86,42 @@ impl GrainVoice {
             let env_index_float = env_pos * (grain_env.len() as f32 - 1.0);
             // let env_index = env_index_float.floor() as usize;
             // Later do linear interpolation for a smoother read
-            let envelope_value = 
-                sinc_interpolation(grain_env, env_index_float);
+            match self.interpolation {
+                Interpolation::FourPoint => {
+                    let envelope_value = 
+                        four_point_interpolation(grain_env, env_index_float);
+                },
+                Interpolation::Sinc => {
+                    let envelope_value = 
+                        sinc_interpolation(grain_env, env_index_float);
+                },
+                Interpolation::Cubic => {
+                    let envelope_value = 
+                        cubic_interpolation(grain_env, env_index_float);
+                },
+                _ => {eprintln!("Interpolation method not implemented yet")},
+            }
             // ----------------------------
             // 2) Source read ramp
             // ----------------------------
             // Each sample, we move forward by `playback_rate` (set by pitch)
             // starting from `base_source_start`.
             let source_index_float = base_source_start + (i as f32 * playback_rate);
-            let source_value = 
-                sinc_interpolation(source_array, source_index_float);
+            match self.interpolation {
+                Interpolation::FourPoint => {
+                    let source_value = 
+                        four_point_interpolation(source_array, source_index_float);
+                },
+                Interpolation::Sinc => {
+                    let source_value = 
+                        sinc_interpolation(source_array, source_index_float);
+                },
+                Interpolation::Cubic => {
+                    let source_value = 
+                        cubic_interpolation(grain_env, env_index_float);
+                },
+                _ => {eprintln!("Interpolation method not implemented yet")},
+            }
             // if i % 4410 == 0 {
                 // println!("Index: {}", source_index_float);
                 // println!("Interpolation: {}", source_value);
@@ -946,27 +979,157 @@ pub extern "C" fn stop_scheduler(
 }
 
 #[no_mangle]
-pub extern "C" fn set_sample_rate() {}
+pub extern "C" fn set_sample_rate(
+    engine_ptr: *mut AudioEngine,
+    sample_rate: u32,
+    ){
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.set_sample_rate(sample_rate);
+}
 #[no_mangle]
-pub extern "C" fn set_file_format() {}
+pub extern "C" fn set_file_format(
+    engine_ptr: *mut AudioEngine,
+    fmt: *const c_char,
+    ) {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    if fmt.is_null() {
+        eprintln!("set_file_format received null string pointer");
+        return;
+    }
+    let c_str = unsafe {std::ffi::CStr::from_ptr(fmt)};
+    let format_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!("Invalid UTF-8 in set_file_format");
+            return;
+        }
+    };
+    engine.set_file_format(format_str);
+}
 #[no_mangle]
-pub extern "C" fn set_bit_depth() {}
+pub extern "C" fn set_bit_depth(
+    engine_ptr: *mut AudioEngine,
+    bitdepth: u16,
+    ){
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.set_bit_depth(bitdepth);
+}
+
 #[no_mangle]
-pub extern "C" fn set_bit_rate() {}
+pub extern "C" fn set_bit_rate(
+    engine_ptr: *mut AudioEngine,
+    bitrate: u32,
+    ) {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.set_bit_rate(bitrate);
+}
 #[no_mangle]
-pub extern "C" fn set_flac_compression() {}
+pub extern "C" fn set_flac_compression(
+    engine_ptr: *mut AudioEngine,
+    level: u8,
+    ) {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.set_flac_compression(level);
+}
 #[no_mangle]
-pub extern "C" fn record () {}
+pub extern "C" fn set_output_device(
+    engine_ptr: *mut AudioEngine,
+    index: usize,
+    ) -> c_int {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    match engine.set_output_device_by_index(index) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
 #[no_mangle]
-pub extern "C" fn stop_recording (){}
+pub extern "C" fn get_output_devices(
+    engine_ptr: *mut AudioEngine,
+    ) {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    engine.get_output_devices();
+    // This should be a list of (index: u8, device: String)
+}
 #[no_mangle]
-pub extern "C" fn set_output_device(){}
+pub extern "C" fn get_default_output_device(
+    engine_ptr: *mut AudioEngine
+) -> *mut c_char {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    let dev_str = engine.get_default_output_device();
+    let c_str = std::ffi::CString::new(dev_str).unwrap();
+    c_str.into_raw()
+    // we return a *mut c_char that the caller must eventually free with 
+    // something like std::ffi::CString::from_raw(...). Or, to keep it simpler,
+    // we can store it in a static buffer or just print it in the native code.
+}
 #[no_mangle]
-pub extern "C" fn show_output_devices(){}
+pub extern "C" fn set_default_output_device(
+    engine_ptr: *mut AudioEngine,
+    ) -> c_int {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    let result = engine.set_default_output_device);
+    match result {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
 #[no_mangle]
-pub extern "C" fn set_default_output_device(){}
+pub extern "C" fn record (
+    engine_ptr: *mut AudioEngine,
+    output_path: *const c_char,
+    ) -> c_int {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    let result = engine.record(output_path);
+    match result {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn get_default_output_device(){}
+pub extern "C" fn stop_recording (
+    engine_ptr: *mut AudioEngine,
+    ) -> c_int {
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+    let result = engine.stop_recording();
+    match result {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
 
 #[repr(C)]
 pub struct GrainEnvelope {
