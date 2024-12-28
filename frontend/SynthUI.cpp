@@ -191,6 +191,7 @@ void SynthUI::onGrainStartReleased() {
     //updateGrainSelectionRect();
 }
 void SynthUI::onGrainStartValueChanged() {
+    // Convert the 0 - 100 into a clock timer... somehow.
     int value = grainStartSlider->value();
     if (value < 10) {
         grainStartLabel->setText(QString("Grain Start:  %1").arg(value));

@@ -5,14 +5,17 @@ use hound;
 use crossbeam_channel::{Sender, Receiver};
 #[allow(unused_imports)]
 use dasp_signal::{self as signal, Signal};
-use std::sync::{Arc, Mutex};
-use std::f32::consts::PI;
-use std::time::{Duration, Instant};
 use rand::Rng;
-//use core::sync::atomic::AtomicBool;
-use std::sync::atomic::AtomicBool;
-use std::thread;
-use std::sync::atomic::Ordering;
+use std::{
+    sync::{Arc, Mutex},
+    f32::consts::PI,
+    time::{Duration, Instant},
+    sync::atomic::AtomicBool,
+    thread,
+    sync::atomic::Ordering,
+    fs::File,
+    io::BufWriter,
+}
 
 // -------------------------------------
 // SPECS, PARAMS
@@ -98,42 +101,146 @@ impl GrainVoice {
     }
 }
 // -------------------------------------
+// RECORDING FORMATS
+// -------------------------------------
+pub struct ExportSettings {
+    pub channels: u16,
+    pub sample_rate: u32,
+    pub bit_depth: u16,
+    pub sample_format: hound::SampleFormat,
+    pub format: String, // "wav", "mp3", "flac", etc.
+    pub format_specific: Option<FormatSpecificSettings>,
+}
+
+pub enum FormatSpecificSettings {
+    WavSettings {},               // WAV doesn't need extra parameters
+    Mp3Settings { bitrate: u32 }, // MP3-specific
+    FlacSettings { compression: u8 }, // FLAC-specific
+}
+
+pub enum Writers {
+    WavWriter(hound::WavWriter<BufWriter<File>>),
+    // In the future, we could add Mp3Writer(...), FlacWriter(...), etc.
+}
+
+// -------------------------------------
 // AUDIO ENGINE STRUCT
 // -------------------------------------
 pub struct AudioEngine {
-    stream: Option<cpal::Stream>,
     synth: Arc<GranularSynth>,  // or references to crossbeam channels
+    output_device: cpal::platform::Device,
+    stream: Option<cpal::Stream>,
+    export_settings: ExportSettings,
+    // Recording
+    is_recording: bool,
+    writer: Option<Arc<Mutex<Writers>>>,
 }
 
 impl AudioEngine {
-    // Add a record function that takes the output from the stream (and two
-    // user defined sample_rate and bit_rate setting functions) and
-    // starts recording, then another function that stops recording and asks
-    // the user for output name
-    // Maybe also a way to choose the buffer size and other stuff like that.
-    pub fn new(synth: Arc<GranularSynth>) -> Self {
-        AudioEngine {
-            synth,
-            stream: None,
-        }
-    }
-
-    pub fn start(&mut self) -> i32 {
-
-        if let Some(existing) = self.stream.take() {
-            drop(existing);
-        }
-
-        // Add Menu Option to Choose Output Device
+    pub fn new(synth: Arc<GranularSynth>, export_settings: ExportSettings) -> Self {
         let host = cpal::default_host();
-        let output_device = match host.default_output_device() {
+        let default_output_device = match host.default_output_device() {
             Some(device) => device,
             None => {
                 eprintln!("No output device found");
                 return -1;
             }
         };
+        AudioEngine {
+            synth,
+            output_device: default_output_device,
+            stream: None,
+            export_settings,
+            is_recording: false,
+            writer: None,
+        }
+    }
+    // ---------------
+    // SETTINGS
+    // ---------------
+    pub fn set_sample_rate(&mut self, sample_rate: u32){
+        self.export_settings.sample_rate = sample_rate;
+    }
 
+    pub fn set_bit_depth(&mut self, bit_depth: u16) {
+        self.export_settings.bit_depth = bit_depth;
+    }
+
+    pub fn set_buffer_size(&mut self, buffer_size: usize) {
+        // Add buffer size logic here
+    }
+
+    pub fn set_file_format(&mut self, fmt: &str){
+        self.export_settings.format = fmt.to_string();
+    }
+
+    pub fn set_bit_rate(&mut self, bitrate: u32){
+        if let Some(FormatSpecificSettings::Mp3Settings { ref mut bitrate: b }) =
+            self.export_settings.format_specific
+        {
+            *b = bitrate;
+        } else {
+            // Possibly override or create new FormatSpecificSettings::Mp3Settings
+            self.export_settings.format_specific = Some(FormatSpecificSettings::Mp3Settings { bitrate });
+        }
+    }
+    
+    pub fn set_flac_compression(&mut self, level: u8) {
+        if let Some(FormatSpecificSettings::FlacSettings { ref mut compression }) =
+            self.export_settings.format_specific
+        {
+            *compression = level;
+        } else {
+            self.export_settings.format_specific =
+                Some(FormatSpecificSettings::FlacSettings { compression: level });
+        }
+    }
+
+    pub fn get_output_devices(&self) {
+        // Should return the list instead
+        let host = cpal::default_host();
+        let devices = match host.output_devices() {
+            Ok(devs) => devs,
+            Err(e) => {
+                eprintln!("Failed to get output devices: {}", e);
+                return;
+            }
+        };
+        for (i, device) in devices.enumerate() {
+            println!("Device #{} = {}", i, device.name().unwrap_or("Unknown".to_string()));
+        }
+    }
+    pub fn set_output_device_by_index(&mut self, index: usize) -> Result<(), String> {
+        let host = cpal::default_host();
+        let devices = host.output_devices().map_err(|e| e.to_string())?;
+        let dev = devices.skip(index).next().ok_or("Invalid device index")?;
+        self.output_device = dev;
+        Ok(())
+    }
+
+    pub fn set_default_output_device(&mut self) -> Result<(), String> {
+        let host = cpal::default_host();
+        let default_dev = host
+            .default_output_device()
+            .ok_or("No default output device found!")?;
+        self.output_device = default_dev;
+        Ok(())
+    }
+
+    pub fn get_default_output_device(&self) -> String {
+        self.output_device
+            .name()
+            .unwrap_or("Unknown device".to_string())
+    }
+
+    // ----------------------
+    // PLAYBACK
+    // ----------------------
+    pub fn start(&mut self) -> i32 {
+        if let Some(existing) = self.stream.take() {
+            drop(existing);
+        }
+        let output_device = self.output_device;
         let config = match output_device.default_output_config() {
             Ok(config) => config,
             Err(e) => {
@@ -141,12 +248,14 @@ impl AudioEngine {
                 return -1;
             }
         };
-        
+
         let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
         let grains_arc = Arc::clone(&active_grains);
-
+        
         let receiver_for_callback = Arc::clone(&self.synth.grain_receiver);
 
+        let writer_for_callback = self.writer.clone();
+        let is_recording_for_callback = self.is_recording;
 
         let stream = match output_device.build_output_stream(
             &config.into(),
@@ -156,8 +265,8 @@ impl AudioEngine {
                     vec.push(ActiveGrain::new(grain_data));
                 }
 
-            let mut grains = grains_arc.lock().unwrap();
-            for frame in data.chunks_mut(2) {
+                let mut grains = grains_arc.lock().unwrap();
+                for frame in data.chunks_mut(2) {
                     let mut mix_sample = 0.0;
                     for g in grains.iter_mut() {
                         mix_sample += g.next_sample();
@@ -166,18 +275,37 @@ impl AudioEngine {
                     frame[1] = mix_sample;
                 }
                 grains.retain(|g| !g.is_finished());
+
+                // Recording
+                if is_recording_for_callback {
+                    if let Some(writer_arc) = &writer_for_callback {
+                        let mut writer_lock = writer_arc.lock().unwrap();
+                        match &mut *writer_lock {
+                            Writers::WavWriter(wav_writer) => {
+                                for &sample in data.iter() {
+                                    // Convert f32 -> i16. 
+                                    // Could do float WAV directly if you want "SampleFormat::Float"
+                                    let sample_i16 = (sample * i16::MAX as f32) as i16;
+                                    if let Err(e) = wav_writer.write_sample(sample_i16) {
+                                        eprintln!("Failed to write sample: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             },
             move |err| {
                 eprintln!("Stream error: {}", err);
             },
             None
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Failed to build output stream: {}", e);
-                return -1;
-            }
-        };
+                ) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        eprintln!("Failed to build output stream: {}", e);
+                        return -1;
+                    }
+                };
 
         if let Err(e) = stream.play() {
             eprintln!("Failed to play stream: {}", e);
@@ -193,9 +321,67 @@ impl AudioEngine {
     pub fn stop(&mut self) {
         self.stream.take();
     }
+
+    // ----------------------
+    // RECORDING
+    // ----------------------
+    pub fn record(&mut self, output_path: &str) -> Result<(), String> { 
+         if self.is_recording {
+             return Err("Already recording!".to_string());
+         }
+         match self.export_settings.format.as_str() {
+             "wav" => {
+                let spec = hound::WavSpec {
+                    channels: self.export_settings.channels,
+                    sample_rate: self.export_settings.sample_rate,
+                    bits_per_sample: self.export_settings.bit_depth,
+                    sample_format: match self.export_settings.sample_format {
+                        hound::SampleFormat::Float => hound::SampleFormat::Float,
+                        hound::SampleFormat::Int => hound::SampleFormat::Int,
+                    },
+                };
+                let file = File::create(output_path).map_err(|e| e.to_string())?;
+                let bw = BufWriter::new(file);
+                let wav_writer = hound::WavWriter::new(bw, spec)
+                    .map_err(|e| e.to_string())?;
+                self.writer = Some(Arc::new(Mutex::new(Writers::WavWriter(wav_writer))));
+            },
+            "mp3" => {
+                return Err("MP3 recording not implemented yet.".to_string());
+            },
+            "flac" => {
+                return Err("FLAC recording not implemented yet.".to_string());
+            },
+            other => {
+                return Err(format!("Unsupported format for recording: {}", other));
+            },
+         };
+
+         self.is_recording = true;
+
+         Ok(())
+    }
+
+    pub fn stop_recording(&mut self) -> Result<(), String> {
+        if !self.is_recording {
+            return Err("Not currently recording!".to_string());
+        }
+        self.is_recording = false;
+
+        // Finalize the writer
+        if let Some(writer_arc) = self.writer.take() {
+            let mut writer_lock = writer_arc.lock().unwrap();
+            match &mut *writer_lock {
+                Writers::WavWriter(wav_writer) => {
+                    wav_writer.finalize().map_err(|e| e.to_string())?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
 }
-
-
 // -------------------------------------
 // MAIN SYNTH STRUCT
 // -------------------------------------
@@ -206,8 +392,8 @@ pub struct GranularSynth {
     params: Arc<Mutex<GrainParams>>,
     counter: Arc<Mutex<usize>>,
     should_stop: Arc<AtomicBool>,
-    grain_sender: Arc<Sender<Vec<f32>>>,
-    grain_receiver: Arc<Receiver<Vec<f32>>>,
+    pub grain_sender: Arc<Sender<Vec<f32>>>,
+    pub grain_receiver: Arc<Receiver<Vec<f32>>>,
 }
 impl GranularSynth {
     // Maybe add a function to set the numbrt of grain_voices
@@ -329,6 +515,8 @@ impl GranularSynth {
     }
 
     pub fn generate_random_parameters() -> (f32, f32) {
+        // For added variability
+        // Perhaps add a new parameter for varying the randomness
         let mut rng = rand::thread_rng();
         let r_a = rng.gen_range(0..10000) as f32;
         let r_b = rng.gen_range(0..200) as f32 / 10000.0 + 1.0;
@@ -756,6 +944,29 @@ pub extern "C" fn stop_scheduler(
     };
     synth.stop_scheduler();
 }
+
+#[no_mangle]
+pub extern "C" fn set_sample_rate() {}
+#[no_mangle]
+pub extern "C" fn set_file_format() {}
+#[no_mangle]
+pub extern "C" fn set_bit_depth() {}
+#[no_mangle]
+pub extern "C" fn set_bit_rate() {}
+#[no_mangle]
+pub extern "C" fn set_flac_compression() {}
+#[no_mangle]
+pub extern "C" fn record () {}
+#[no_mangle]
+pub extern "C" fn stop_recording (){}
+#[no_mangle]
+pub extern "C" fn set_output_device(){}
+#[no_mangle]
+pub extern "C" fn show_output_devices(){}
+#[no_mangle]
+pub extern "C" fn set_default_output_device(){}
+#[no_mangle]
+pub extern "C" fn get_default_output_device(){}
 
 #[repr(C)]
 pub struct GrainEnvelope {
