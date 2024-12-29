@@ -12,11 +12,13 @@
 #include <QMessageBox>
 #include <QMenuBar>
 #include <QMenu>
+#include <QDialog>
+#include <QSpingBox>
+#include <QComboBox>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
     typedef struct GranularSynth GranularSynth;
     typedef struct AudioEngine AudioEngine;
     typedef struct SourceArray {
@@ -39,6 +41,20 @@ extern "C" {
     int audio_engine_start(AudioEngine* ptr);
     void audio_engine_stop(AudioEngine* ptr);
     void destroy_audio_engine(AudioEngine* ptr);
+
+    void set_sample_rate(AudioEngine* ptr, uint32_t sr);
+    void set_file_format(AudioEngine* ptr, const char* fmt);
+    void set_bit_depth(AudioEngine* ptr, uint16_t bit_depth);
+    void set_bit_rate(AudioEngine* ptr, uint32_t bitrate);
+    void set_flac_compression(AudioEngine* ptr, uint8_t level);
+
+    int set_output_device(AudioEngine* ptr, size_t index);
+    void get_output_devices(AudioEngine* ptr);
+    int set_default_output_device(AudioEngine* ptr);
+    char* get_default_output_device(AudioEngine* ptr);
+
+    int record(AudioEngine* ptr, const char* output_path);
+    int stop_recording(AudioEngine* ptr);
 
     void start_scheduler(GranularSynth* ptr);
     void stop_scheduler(GranularSynth* ptr);
@@ -88,6 +104,9 @@ private slots:
     void onOverlapValueChanged();
     void onPlayAudioClicked();
     void onStopAudioClicked();
+    void onAudioSettingsClicked();
+    void onRecordClicked();
+    void onStopRecordingClicked();
 
 private:
     GranularSynth* synthPtr = nullptr;
@@ -110,7 +129,10 @@ private:
     QMenuBar *menuBar;
     QMenu *fileMenu;
     QAction *loadAction;
+    QAction *settingsAction;
     
+    QPushButton *recordButton;
+    QPushButton *stopRecordingButton;
     QPushButton *loadFileButton;
     QPushButton *playButton;
     QPushButton *stopButton;

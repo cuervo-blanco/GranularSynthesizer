@@ -18,12 +18,18 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     connect(loadFileButton, &QPushButton::clicked, this, &SynthUI::onLoadFileClicked);
     mainLayout->addWidget(loadFileButton);
 
+    // Menu Bar
     QMenuBar *menuBar = new QMenuBar(this);
     QMenu *fileMenu = menuBar->addMenu("File");
+
     QAction *loadAction = new QAction("Load", this);
     fileMenu->addAction(loadAction);
     connect(loadAction, &QAction::triggered, this, &SynthUI::onLoadFileClicked);
     mainLayout->setMenuBar(menuBar);
+
+    QAction *settingsAction = new QAction("Audio Settings" , this);
+    fileMenu->addAction(settingsAction);
+    connect(settingsAction, &QAction::triggered, this, &SynthUI::onAudioSettingsClicked);
 
     // Waveform 
     waveformLabel = new QLabel("Audio Waveform:", this);
@@ -101,8 +107,17 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     mainLayout->addLayout(sliderLayout);
 
-
     // Buttons
+    recordButton = new QPushButton("Record", this);
+    connect(recordButton, &QPushButton::clicked, this, &SynthUI::onRecordClicked);
+    recordButton->setEnabled(false); 
+    mainLayout->addWidget(recordButton);
+
+    stopRecordingButton = new QPushButton("Stop Recording", this);
+    connect(stopRecordingButton, &QPushButton::clicked, this, &SynthUI::onStopRecordingClicked);
+    stopRecordingButton->setEnabled(false); 
+    mainLayout->addWidget(stopRecordingButton);
+
     playButton = new QPushButton("Play Audio", this);
     connect(playButton, &QPushButton::clicked, this, &SynthUI::onPlayAudioClicked);
     playButton->setEnabled(false); 
@@ -133,6 +148,30 @@ SynthUI::~SynthUI() {
         destroy_synth(synthPtr);
         synthPtr = nullptr;
     }
+}
+
+void SynthUI::onAudioSettingsClicked() {
+    AudioSettingsDialog dialog(this, enginePtr);
+    dialog.exec();
+}
+
+void SynthUI::onRecordClicked() {
+    if (!enginePtr) {
+        QMessageBox::warning(this, "Error", "No audio engine available!");
+        return;
+    }
+    // prompt user for file path
+    QString filePath = QFileDialog::getSaveFileName(this, "Save Recording As", "", "Wav Files (*.wav)");
+    if (filePath.isEmpty()) return;
+
+    // We might also want to set the format to "wav"
+    QByteArray ba = filePath.toUtf8();
+    record(enginePtr, ba.constData()); // a hypothetical function
+}
+
+void SynthUI::onStopRecordClicked() {
+    if (!enginePtr) return;
+    stop_recording(enginePtr);
 }
 
 void SynthUI::onLoadFileClicked() {
