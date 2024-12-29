@@ -206,8 +206,8 @@ void SynthUI::onStopRecordingClicked() {
     if (result != 0) {
         QMessageBox::critical(this, "Record Error", "Failed to stop recording!");
     } else {
-        recordButton->setEnable(true);
-        stopRecording->setEnabled(false);
+        recordButton->setEnabled(true);
+        stopRecordingButton->setEnabled(false);
     }
 }
 
@@ -219,7 +219,7 @@ void SynthUI::onLoadFileClicked() {
             tr("WAV Files (*.wav)")
     );
 
-    if (loadFilePath.isEmpty()) {
+    if (loadedFilePath.isEmpty()) {
         return;
     }
 

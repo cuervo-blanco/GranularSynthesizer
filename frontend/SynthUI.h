@@ -13,9 +13,10 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QDialog>
-#include <QSpingBox>
+#include <QSpinBox>
 #include <QComboBox>
 #include <vector>
+#include "AudioSettingsDialog.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,17 +50,6 @@ extern "C" {
     void set_bit_depth(AudioEngine* ptr, unsigned short bit_depth);
     void set_bit_rate(AudioEngine* ptr, unsigned int bitrate);
     void set_flac_compression(AudioEngine* ptr, unsigned char level);
-
-    typedef struct DeviceInfo {
-        size_t index;
-        const char* name;
-    } DeviceInfo;
-
-    typedef struct DeviceList {
-        const DeviceInfo* devices;
-        size_t count;
-    } DeviceList;
-
 
     DeviceList get_output_devices(AudioEngine* ptr);
     void free_device_list(DeviceList list);

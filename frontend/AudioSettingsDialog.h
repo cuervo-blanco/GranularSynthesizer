@@ -16,6 +16,7 @@ extern "C" {
         const void* devices;
         size_t count;
     } DeviceList;
+
     typedef struct DeviceInfo {
         size_t index;
         const char* name;
@@ -27,7 +28,7 @@ extern "C" {
 
     int set_default_output_device(AudioEngine* ptr);
 
-    void set_sample_rate(AudioEngine* ptr, unsigned int sr)2;
+    void set_sample_rate(AudioEngine* ptr, unsigned int sr);
     void set_bit_depth(AudioEngine* ptr, unsigned short bit_depth);
     void set_file_format(AudioEngine* ptr, const char* fmt);
     void set_bit_rate(AudioEngine* ptr, unsigned int bitrate);
