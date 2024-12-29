@@ -2,6 +2,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 #[allow(unused_imports)]
 use cpal::{SampleRate, Stream};
 use hound;
+use hound::WavWriter;
 use crossbeam_channel::{Sender, Receiver};
 #[allow(unused_imports)]
 use dasp_signal::{self as signal, Signal};
@@ -15,7 +16,8 @@ use std::{
     sync::atomic::Ordering,
     fs::File,
     io::BufWriter,
-}
+};
+
 
 // -------------------------------------
 // SPECS, PARAMS
@@ -44,10 +46,12 @@ pub struct GrainVoice {
     mydur: f32,
     interpolation: Interpolation
 }
+#[derive(Clone)]
 pub enum Interpolation {
     FourPoint,
     Sinc,
-    Cubic
+    Cubic,
+    Linear
 }
 
 impl GrainVoice {
@@ -56,7 +60,7 @@ impl GrainVoice {
             mystart,
             mypitch,
             mydur,
-            Interpolation::Sinc,
+            interpolation: Interpolation::Sinc,
         }
     }
 
@@ -67,10 +71,16 @@ impl GrainVoice {
         grain_params: &GrainParams,
     ) -> Vec<f32> {
         // How many samples in this grain?
-        let (sample_rate, _channels) = 
-            (grain_params.specs.sample_rate, grain_params.specs.channels);
+        let (sample_rate, _channels) = (
+            grain_params.specs.sample_rate,
+            grain_params.specs.channels
+            );
+        // total # of samples for this grain
         let duration_in_samples =
-            (self.mydur * grain_params.grain_duration as f32) / 1000.0 * sample_rate as f32;
+            (self.mydur * grain_params.grain_duration as f32) 
+            / 1000.0 
+            * sample_rate as f32;
+        
         let base_source_start = grain_params.grain_start + self.mystart;
         let playback_rate = self.mypitch * grain_params.grain_pitch;
         // let total_duration_samples = duration_in_samples / playback_rate;
@@ -86,50 +96,42 @@ impl GrainVoice {
             let env_index_float = env_pos * (grain_env.len() as f32 - 1.0);
             // let env_index = env_index_float.floor() as usize;
             // Later do linear interpolation for a smoother read
-            match self.interpolation {
+            let envelope_value = match self.interpolation {
                 Interpolation::FourPoint => {
-                    let envelope_value = 
-                        four_point_interpolation(grain_env, env_index_float);
+                        four_point_interpolation(grain_env, env_index_float)
                 },
                 Interpolation::Sinc => {
-                    let envelope_value = 
-                        sinc_interpolation(grain_env, env_index_float);
+                        sinc_interpolation(grain_env, env_index_float)
                 },
                 Interpolation::Cubic => {
-                    let envelope_value = 
-                        cubic_interpolation(grain_env, env_index_float);
+                        cubic_interpolation(grain_env, env_index_float)
                 },
-                _ => {eprintln!("Interpolation method not implemented yet")},
-            }
+                Interpolation::Linear => {
+                        linear_interpolation(grain_env, env_index_float)
+                },
+            };
             // ----------------------------
             // 2) Source read ramp
             // ----------------------------
             // Each sample, we move forward by `playback_rate` (set by pitch)
             // starting from `base_source_start`.
             let source_index_float = base_source_start + (i as f32 * playback_rate);
-            match self.interpolation {
+            let source_value = match self.interpolation {
                 Interpolation::FourPoint => {
-                    let source_value = 
-                        four_point_interpolation(source_array, source_index_float);
+                        four_point_interpolation(source_array, source_index_float)
                 },
                 Interpolation::Sinc => {
-                    let source_value = 
-                        sinc_interpolation(source_array, source_index_float);
+                        sinc_interpolation(source_array, source_index_float)
                 },
                 Interpolation::Cubic => {
-                    let source_value = 
-                        cubic_interpolation(grain_env, env_index_float);
+                        cubic_interpolation(grain_env, env_index_float)
                 },
-                _ => {eprintln!("Interpolation method not implemented yet")},
-            }
-            // if i % 4410 == 0 {
-                // println!("Index: {}", source_index_float);
-                // println!("Interpolation: {}", source_value);
-            // }
-            
+                Interpolation::Linear => {
+                        linear_interpolation(grain_env, env_index_float)
+                }
+            };
             output[i] = source_value * envelope_value;
         }
-
         output
     }
 }
@@ -156,27 +158,43 @@ pub enum Writers {
     // In the future, we could add Mp3Writer(...), FlacWriter(...), etc.
 }
 
+fn dummy_placeholder() -> WavWriter<BufWriter<File>> {
+    let temp_file = std::fs::File::create("/dev/null")
+        .expect("Failed to create a dummy file");
+    let spec = hound::WavSpec {
+        bits_per_sample: 16,
+        channels: 1,
+        sample_format: hound::SampleFormat::Int,
+        sample_rate: 16000,
+    };
+    let buf_writer = BufWriter::new(temp_file);
+    WavWriter::new(buf_writer, spec)
+        .expect("Failed to create a dummy WavWriter")
+}
 // -------------------------------------
 // AUDIO ENGINE STRUCT
 // -------------------------------------
 pub struct AudioEngine {
-    synth: Arc<GranularSynth>,  // or references to crossbeam channels
+    synth: Arc<GranularSynth>,
     output_device: cpal::platform::Device,
     stream: Option<cpal::Stream>,
     export_settings: ExportSettings,
-    // Recording
     is_recording: bool,
     writer: Option<Arc<Mutex<Writers>>>,
 }
 
 impl AudioEngine {
-    pub fn new(synth: Arc<GranularSynth>, export_settings: ExportSettings) -> Self {
+    pub fn new(
+        synth: Arc<GranularSynth>,
+        export_settings: ExportSettings
+        ) -> Self {
         let host = cpal::default_host();
         let default_output_device = match host.default_output_device() {
             Some(device) => device,
             None => {
-                eprintln!("No output device found");
-                return -1;
+                // Either return a Result or panic! 
+                eprintln!("No default output device found! Panicking...");
+                panic!("No default output device found!");
             }
         };
         AudioEngine {
@@ -199,8 +217,14 @@ impl AudioEngine {
         self.export_settings.bit_depth = bit_depth;
     }
 
-    pub fn set_buffer_size(&mut self, buffer_size: usize) {
+    pub fn set_buffer_size(&mut self, _buffer_size: usize) {
         // Add buffer size logic here
+        // TODO: possibly set custom buffer size in the cpal config
+        // pub struct StreamConfig {
+            // pub channels: ChannelCount,
+            // pub sample_rate: SampleRate,
+            // **pub buffer_size: BufferSize,
+        // } 
     }
 
     pub fn set_file_format(&mut self, fmt: &str){
@@ -208,13 +232,14 @@ impl AudioEngine {
     }
 
     pub fn set_bit_rate(&mut self, bitrate: u32){
-        if let Some(FormatSpecificSettings::Mp3Settings { ref mut bitrate: b }) =
+        if let Some(FormatSpecificSettings::Mp3Settings { bitrate: ref mut b }) =
             self.export_settings.format_specific
         {
             *b = bitrate;
         } else {
             // Possibly override or create new FormatSpecificSettings::Mp3Settings
-            self.export_settings.format_specific = Some(FormatSpecificSettings::Mp3Settings { bitrate });
+            self.export_settings.format_specific = 
+                Some(FormatSpecificSettings::Mp3Settings { bitrate });
         }
     }
     
@@ -229,21 +254,27 @@ impl AudioEngine {
         }
     }
 
-    pub fn get_output_devices(&self) {
-        // Should return the list instead
+    pub fn get_output_devices(&self) -> Vec<(usize, String)> {
         let host = cpal::default_host();
+        let mut results = Vec::new();
         let devices = match host.output_devices() {
             Ok(devs) => devs,
             Err(e) => {
                 eprintln!("Failed to get output devices: {}", e);
-                return;
+                return results;
             }
         };
-        for (i, device) in devices.enumerate() {
-            println!("Device #{} = {}", i, device.name().unwrap_or("Unknown".to_string()));
+        for (index, device) in devices.enumerate() {
+            let name = device.name().unwrap_or("Unknown".to_string());
+            results.push((index, name));
         }
+        results
     }
-    pub fn set_output_device_by_index(&mut self, index: usize) -> Result<(), String> {
+
+    pub fn set_output_device_by_index(
+        &mut self,
+        index: usize
+    ) -> Result<(), String> {
         let host = cpal::default_host();
         let devices = host.output_devices().map_err(|e| e.to_string())?;
         let dev = devices.skip(index).next().ok_or("Invalid device index")?;
@@ -270,10 +301,12 @@ impl AudioEngine {
     // PLAYBACK
     // ----------------------
     pub fn start(&mut self) -> i32 {
+        // if Stream already exists, drop it and re-build
         if let Some(existing) = self.stream.take() {
             drop(existing);
         }
-        let output_device = self.output_device;
+        let output_device = &self.output_device;
+        // Perhaps here build the config based on the user settings?
         let config = match output_device.default_output_config() {
             Ok(config) => config,
             Err(e) => {
@@ -287,25 +320,31 @@ impl AudioEngine {
         
         let receiver_for_callback = Arc::clone(&self.synth.grain_receiver);
 
+        // For recording
         let writer_for_callback = self.writer.clone();
         let is_recording_for_callback = self.is_recording;
 
         let stream = match output_device.build_output_stream(
             &config.into(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                // 1. gather any newly scheduled grains
                 while let Ok(grain_data) = receiver_for_callback.try_recv() {
                     let mut vec = grains_arc.lock().unwrap();
                     vec.push(ActiveGrain::new(grain_data));
                 }
 
+                // 2. fill the audio buffer
                 let mut grains = grains_arc.lock().unwrap();
                 for frame in data.chunks_mut(2) {
                     let mut mix_sample = 0.0;
                     for g in grains.iter_mut() {
                         mix_sample += g.next_sample();
                     }
-                    frame[0] = mix_sample;
-                    frame[1] = mix_sample;
+                    for sample in frame.iter_mut() {
+                        *sample = mix_sample;
+                    }
+                    //frame[0] = mix_sample;
+                    //frame[1] = mix_sample;
                 }
                 grains.retain(|g| !g.is_finished());
 
@@ -404,7 +443,9 @@ impl AudioEngine {
         // Finalize the writer
         if let Some(writer_arc) = self.writer.take() {
             let mut writer_lock = writer_arc.lock().unwrap();
-            match &mut *writer_lock {
+            let writer = std::mem::replace(&mut *writer_lock, Writers::WavWriter(dummy_placeholder()));
+
+            match writer {
                 Writers::WavWriter(wav_writer) => {
                     wav_writer.finalize().map_err(|e| e.to_string())?;
                 }
@@ -656,7 +697,6 @@ impl ActiveGrain {
 // HELPER FUNCTIONS
 // -------------------------------------
 
-#[allow(dead_code)]
 fn linear_interpolation(buffer: &[f32], x: f32) -> f32 {
     // x is the fractional index. E.g. 12.3 => index0=12, index1=13, frac=0.3
     let index0 = x.floor() as usize;
@@ -678,7 +718,6 @@ fn sinc(x: f32) -> f32 {
     }
 }
 
-#[allow(dead_code)]
 fn sinc_interpolation(buffer: &[f32], x: f32) -> f32 {
     let n = buffer.len() as isize;
     let i = x.floor() as isize;
@@ -704,7 +743,6 @@ fn sinc_interpolation(buffer: &[f32], x: f32) -> f32 {
     }
 }
 
-#[allow(dead_code)]
 fn cubic_interpolation(buffer: &[f32], x: f32) -> f32 {
     let n = buffer.len() as isize;
     let i = x.floor() as isize;
@@ -733,7 +771,6 @@ fn cubic_interpolation(buffer: &[f32], x: f32) -> f32 {
     a * frac3 + b * frac2 + c * frac + d
 }
 
-#[allow(dead_code)]
 fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
     if buffer.is_empty() {
         eprintln!("Buffer is empty [interpolation error]");
@@ -763,9 +800,8 @@ fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
 }
 
 // -------------------------------------
-// FRONT-END SPECIFIC API
+// C API
 // -------------------------------------
-#[allow(unused_imports)]
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 #[allow(unused_imports)]
@@ -775,26 +811,6 @@ use std::ptr;
 pub extern "C" fn create_synth() -> *mut GranularSynth {
     let synth = Box::new(GranularSynth::new());
     Box::into_raw(synth)
-}
-
-#[no_mangle]
-pub extern "C" fn get_sample_rate(synth_ptr: *mut GranularSynth) -> u32 {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &mut *synth_ptr
-    };
-    let params = synth.params.lock().unwrap();
-    params.specs.sample_rate
-}
-
-#[no_mangle]
-pub extern "C" fn get_total_channels(synth_ptr: *mut GranularSynth) -> u16 {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &mut *synth_ptr
-    };
-    let params = synth.params.lock().unwrap();
-    params.specs.channels
 }
 
 #[no_mangle]
@@ -808,17 +824,154 @@ pub extern "C" fn destroy_synth(ptr: *mut GranularSynth) {
 }
 
 #[no_mangle]
+pub extern "C" fn load_audio_from_file(
+    synth_ptr: *mut GranularSynth,
+    file_path: *const c_char,
+) -> c_int {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+
+    if file_path.is_null() {
+        return -1;
+    }
+    let c_str = unsafe {std::ffi::CStr::from_ptr(file_path)};
+    let path_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+
+    let result = 
+        synth.load_audio_from_file(
+            path_str.as_bytes().as_ptr(), path_str.len());
+    result
+}
+
+#[no_mangle]
+pub extern "C" fn generate_grain_envelope(
+    synth_ptr: *mut GranularSynth,
+    size: usize,
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.generate_grain_envelope(size);
+}
+
+#[no_mangle]
+pub extern "C" fn start_scheduler(
+    synth_ptr: *mut GranularSynth
+){
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    synth.start_scheduler();
+}
+
+#[no_mangle]
+pub extern "C" fn stop_scheduler(
+    synth_ptr: *mut GranularSynth
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.stop_scheduler();
+}
+
+#[no_mangle]
+pub extern "C" fn set_params(
+    synth_ptr: *mut GranularSynth,
+    start: f32,
+    duration: usize,
+    overlap: f32,
+    pitch: f32,
+){
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    synth.set_params(start, duration, overlap, pitch);
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_start(
+    synth_ptr: *mut GranularSynth, 
+    start: f32
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_start = 
+        start.clamp(0.0, 1.0) as f32 * params.specs.filesize as f32;
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_duration(
+    synth_ptr: *mut GranularSynth, 
+    duration: usize
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_duration = duration;
+}
+
+#[no_mangle]
+pub extern "C" fn set_grain_pitch(
+    synth_ptr: *mut GranularSynth, 
+    pitch: f32
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
+}
+
+#[no_mangle]
+pub extern "C" fn set_overlap(
+    synth_ptr: *mut GranularSynth, 
+    overlap: f32
+) {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &*synth_ptr
+    };
+    let mut params = synth.params.lock().unwrap();
+    params.grain_overlap = overlap.clamp(1.0, 2.0);
+}
+
+#[no_mangle]
 pub extern "C" fn create_audio_engine(
     synth_ptr: *mut GranularSynth
-    ) -> *mut AudioEngine {
+) -> *mut AudioEngine {
     unsafe {
         assert!(!synth_ptr.is_null());
         let synth_ref = &*synth_ptr;
         let arc_synth = Arc::new(synth_ref.clone_for_thread());
-        let engine = AudioEngine::new(arc_synth);
-        let boxed = Box::new(engine);
-        Box::into_raw(boxed)
-    } 
+
+        // Provide a default ExportSettings
+        let default_export_settings = ExportSettings {
+            channels: 2,
+            sample_rate: 44100,
+            bit_depth: 16,
+            sample_format: hound::SampleFormat::Int,
+            format: "wav".to_string(),
+            format_specific: Some(FormatSpecificSettings::WavSettings {}),
+        };
+
+        let engine = AudioEngine::new(arc_synth, default_export_settings);
+        Box::into_raw(Box::new(engine))
+    }
 }
 
 #[no_mangle]
@@ -827,9 +980,8 @@ pub extern "C" fn audio_engine_start(engine_ptr: *mut AudioEngine) -> c_int {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
-    engine.start()
+    engine.start() as c_int
 }
-
 
 #[no_mangle]
 pub extern "C" fn audio_engine_stop(engine_ptr: *mut AudioEngine) {
@@ -852,148 +1004,22 @@ pub extern "C" fn destroy_audio_engine(engine_ptr: *mut AudioEngine) {
 }
 
 #[no_mangle]
-pub extern "C" fn load_audio_from_file(
-    synth_ptr: *mut GranularSynth,
-    file_path: *const c_char,
-    ) -> c_int {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    
-    if file_path.is_null() {
-        return -1;
-    }
-    let c_str = unsafe {std::ffi::CStr::from_ptr(file_path)};
-    let path_str = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
-
-    let result = 
-        synth.load_audio_from_file(
-            path_str.as_bytes().as_ptr(), path_str.len());
-    result
-}
-
-#[no_mangle]
-pub extern "C" fn generate_grain_envelope(
-    synth_ptr: *mut GranularSynth,
-    size: usize,
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    synth.generate_grain_envelope(size);
-}
-
-#[no_mangle]
-pub extern "C" fn set_params(
-    synth_ptr: *mut GranularSynth,
-    start: f32,
-    duration: usize,
-    overlap: f32,
-    pitch: f32,
-    ){
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    synth.set_params(start, duration, overlap, pitch);
-}
-
-#[no_mangle]
-pub extern "C" fn set_grain_start(
-    synth_ptr: *mut GranularSynth, 
-    start: f32
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    let mut params = synth.params.lock().unwrap();
-    params.grain_start = 
-        start.clamp(0.0, 1.0) as f32 * params.specs.filesize as f32;
-}
-
-#[no_mangle]
-pub extern "C" fn set_grain_duration(
-    synth_ptr: *mut GranularSynth, 
-    duration: usize
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    let mut params = synth.params.lock().unwrap();
-    params.grain_duration = duration;
-}
-
-#[no_mangle]
-pub extern "C" fn set_grain_pitch(
-    synth_ptr: *mut GranularSynth, 
-    pitch: f32
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    let mut params = synth.params.lock().unwrap();
-    params.grain_pitch = pitch.clamp(0.1, 2.0) as f32;
-}
-
-#[no_mangle]
-pub extern "C" fn set_overlap(
-    synth_ptr: *mut GranularSynth, 
-    overlap: f32
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    let mut params = synth.params.lock().unwrap();
-    params.grain_overlap = overlap.clamp(1.0, 2.0);
-}
-
-#[no_mangle]
-pub extern "C" fn start_scheduler(
-    synth_ptr: *mut GranularSynth
-    ){
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &mut *synth_ptr
-    };
-    synth.start_scheduler();
-}
-
-#[no_mangle]
-pub extern "C" fn stop_scheduler(
-    synth_ptr: *mut GranularSynth
-    ) {
-    let synth = unsafe {
-        assert!(!synth_ptr.is_null());
-        &*synth_ptr
-    };
-    synth.stop_scheduler();
-}
-
-#[no_mangle]
 pub extern "C" fn set_sample_rate(
     engine_ptr: *mut AudioEngine,
     sample_rate: u32,
-    ){
+){
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
     engine.set_sample_rate(sample_rate);
 }
+
 #[no_mangle]
 pub extern "C" fn set_file_format(
     engine_ptr: *mut AudioEngine,
     fmt: *const c_char,
-    ) {
+) {
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
@@ -1012,11 +1038,12 @@ pub extern "C" fn set_file_format(
     };
     engine.set_file_format(format_str);
 }
+
 #[no_mangle]
 pub extern "C" fn set_bit_depth(
     engine_ptr: *mut AudioEngine,
     bitdepth: u16,
-    ){
+){
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
@@ -1028,29 +1055,31 @@ pub extern "C" fn set_bit_depth(
 pub extern "C" fn set_bit_rate(
     engine_ptr: *mut AudioEngine,
     bitrate: u32,
-    ) {
+) {
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
     engine.set_bit_rate(bitrate);
 }
+
 #[no_mangle]
 pub extern "C" fn set_flac_compression(
     engine_ptr: *mut AudioEngine,
     level: u8,
-    ) {
+) {
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
     engine.set_flac_compression(level);
 }
+
 #[no_mangle]
 pub extern "C" fn set_output_device(
     engine_ptr: *mut AudioEngine,
     index: usize,
-    ) -> c_int {
+) -> c_int {
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
@@ -1060,17 +1089,70 @@ pub extern "C" fn set_output_device(
         Err(_) => -1,
     }
 }
+
+#[repr(C)]
+pub struct DeviceInfo {
+    index: usize,
+    name: *const c_char,
+}
+
+#[repr(C)]
+pub struct DeviceList {
+    devices: *const DeviceInfo,
+    count: usize,
+}
+
 #[no_mangle]
 pub extern "C" fn get_output_devices(
     engine_ptr: *mut AudioEngine,
-    ) {
+    ) -> DeviceList {
     let engine = unsafe {
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
-    engine.get_output_devices();
-    // This should be a list of (index: u8, device: String)
+    let device_vec = engine.get_output_devices();
+    let mut device_infos: Vec<DeviceInfo> = device_vec
+        .iter()
+        .map(|(idx, name)| {
+            let c_string = CString::new(name.clone())
+                .unwrap_or_else(|_| CString::new("Unknown").unwrap());
+            DeviceInfo {
+                index: *idx,
+                name: c_string.into_raw(),
+            }
+        }).collect();
+    let ptr = device_infos.as_mut_ptr();
+    let count = device_infos.len();
+
+    // We must forget device_infos so it's not freed at the end of scope
+    std::mem::forget(device_infos);
+
+    DeviceList { devices: ptr, count }
 }
+
+#[no_mangle]
+pub extern "C" fn free_device_list(device_list: DeviceList) {
+    if device_list.devices.is_null() {
+        return;
+    }
+
+    let devices = unsafe { 
+        Vec::from_raw_parts(
+            device_list.devices as *mut DeviceInfo, 
+            device_list.count, 
+            device_list.count
+        ) 
+    };
+
+    for device in devices {
+        if !device.name.is_null() {
+            unsafe {
+                let _ = CString::from_raw(device.name as *mut c_char);
+            }
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn get_default_output_device(
     engine_ptr: *mut AudioEngine
@@ -1082,10 +1164,8 @@ pub extern "C" fn get_default_output_device(
     let dev_str = engine.get_default_output_device();
     let c_str = std::ffi::CString::new(dev_str).unwrap();
     c_str.into_raw()
-    // we return a *mut c_char that the caller must eventually free with 
-    // something like std::ffi::CString::from_raw(...). Or, to keep it simpler,
-    // we can store it in a static buffer or just print it in the native code.
 }
+
 #[no_mangle]
 pub extern "C" fn set_default_output_device(
     engine_ptr: *mut AudioEngine,
@@ -1094,12 +1174,13 @@ pub extern "C" fn set_default_output_device(
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
-    let result = engine.set_default_output_device);
+    let result = engine.set_default_output_device();
     match result {
         Ok(_) => 0,
         Err(_) => -1,
     }
 }
+
 #[no_mangle]
 pub extern "C" fn record (
     engine_ptr: *mut AudioEngine,
@@ -1109,8 +1190,15 @@ pub extern "C" fn record (
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
-    let result = engine.record(output_path);
-    match result {
+    if output_path.is_null() {
+        return -1;
+    }
+    let c_str = unsafe { std::ffi::CStr::from_ptr(output_path) };
+    let path_str = match c_str.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    match engine.record(path_str) {
         Ok(_) => 0,
         Err(_) => -1,
     }
@@ -1124,8 +1212,7 @@ pub extern "C" fn stop_recording (
         assert!(!engine_ptr.is_null());
         &mut *engine_ptr
     };
-    let result = engine.stop_recording();
-    match result {
+    match engine.stop_recording() {
         Ok(_) => 0,
         Err(_) => -1,
     }
@@ -1153,7 +1240,6 @@ pub extern "C" fn get_grain_envelope(
     std::mem::forget(grain_envelope);
     envelope
 }
-
 
 #[no_mangle]
 pub extern "C" fn free_grain_envelope(envelope: GrainEnvelope) {
@@ -1191,7 +1277,6 @@ pub extern "C" fn get_source_array(
     array
 }
 
-
 #[no_mangle]
 pub extern "C" fn free_source_array(array: SourceArray) {
     unsafe {
@@ -1204,6 +1289,27 @@ pub extern "C" fn free_source_array(array: SourceArray) {
         }
     }
 }
+
+#[no_mangle]
+pub extern "C" fn get_sample_rate(synth_ptr: *mut GranularSynth) -> c_int {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    let params = synth.params.lock().unwrap();
+    params.specs.sample_rate as c_int
+}
+
+#[no_mangle]
+pub extern "C" fn get_total_channels(synth_ptr: *mut GranularSynth) -> c_int {
+    let synth = unsafe {
+        assert!(!synth_ptr.is_null());
+        &mut *synth_ptr
+    };
+    let params = synth.params.lock().unwrap();
+    params.specs.channels as c_int
+}
+
 // -------------------------------------
 // TESTS
 // -------------------------------------
