@@ -163,7 +163,7 @@ fn dummy_placeholder() -> WavWriter<BufWriter<File>> {
         .expect("Failed to create a dummy file");
     let spec = hound::WavSpec {
         bits_per_sample: 16,
-        channels: 1,
+        channels: 2,
         sample_format: hound::SampleFormat::Int,
         sample_rate: 16000,
     };
