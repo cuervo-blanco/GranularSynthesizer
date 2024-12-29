@@ -1,22 +1,51 @@
 #include "SynthUI.h"
+#include "AudioSettingsDialog.h" 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileDialog>
+#include <QPainterPath>
 #include <QMessageBox>
+#include <QGraphicsPathItem>
 #include <QGraphicsRectItem>
+#include <QPen>
+#include <algorithm>
+#include <cmath>
 
 // Constructor
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
-    isPlaying = false;
-    synthPtr = create_synth();
-    enginePtr = create_audio_engine(synthPtr);
-    generate_grain_envelope(synthPtr, 2048);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-    loadFileButton = new QPushButton("Load Audio File", this);
-    connect(loadFileButton, &QPushButton::clicked, this, &SynthUI::onLoadFileClicked);
+
+    // Buttons
+    loadFileButton = new QPushButton("Load WAV", this);
+    connect(loadFileButton, &QPushButton::clicked, 
+            this, &SynthUI::onLoadFileClicked);
     mainLayout->addWidget(loadFileButton);
+
+    playButton = new QPushButton("Play", this);
+    connect(playButton, &QPushButton::clicked, 
+            this, &SynthUI::onPlayAudioClicked);
+    playButton->setEnabled(false); 
+    mainLayout->addWidget(playButton);
+
+    stopButton = new QPushButton("Stop", this);
+    connect(stopButton, &QPushButton::clicked,
+            this, &SynthUI::onStopAudioClicked);
+    stopButton->setEnabled(false); 
+    mainLayout->addWidget(stopButton);
+
+    recordButton = new QPushButton("Record", this);
+    connect(recordButton, &QPushButton::clicked, 
+            this, &SynthUI::onRecordClicked);
+    recordButton->setEnabled(false); 
+    mainLayout->addWidget(recordButton);
+
+    stopRecordingButton = new QPushButton("Stop Recording", this);
+    connect(stopRecordingButton, &QPushButton::clicked,
+            this, &SynthUI::onStopRecordingClicked);
+    stopRecordingButton->setEnabled(false); 
+    mainLayout->addWidget(stopRecordingButton);
 
     // Menu Bar
     QMenuBar *menuBar = new QMenuBar(this);
@@ -24,12 +53,67 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     QAction *loadAction = new QAction("Load", this);
     fileMenu->addAction(loadAction);
-    connect(loadAction, &QAction::triggered, this, &SynthUI::onLoadFileClicked);
+    connect(loadAction, &QAction::triggered, 
+            this, &SynthUI::onLoadFileClicked);
     mainLayout->setMenuBar(menuBar);
 
     QAction *settingsAction = new QAction("Audio Settings" , this);
     fileMenu->addAction(settingsAction);
-    connect(settingsAction, &QAction::triggered, this, &SynthUI::onAudioSettingsClicked);
+    connect(settingsAction, &QAction::triggered, 
+            this, &SynthUI::onAudioSettingsClicked);
+
+    
+    // Sliders
+    QHBoxLayout *sliderLayout = new QHBoxLayout();
+    grainStartLabel = new QLabel("Grain Start", this);
+    grainStartSlider = new QSlider(Qt::Horizontal, this);
+    grainStartSlider->setRange(0,100);
+    grainStartSlider->setValue(0);
+    connect(grainStartSlider, &QSlider::sliderReleased, 
+            this, &SynthUI::onGrainStartReleased);
+    connect(grainStartSlider, &QSlider::valueChanged, 
+            this, &SynthUI::onGrainStartValueChanged);
+    sliderLayout->addWidget(grainStartLabel);
+    sliderLayout->addWidget(grainStartSlider);
+    grainStartSlider->setEnabled(false); 
+
+    grainDurationLabel = new QLabel("Grain Duration", this);
+    grainDurationSlider = new QSlider(Qt::Horizontal, this);
+    grainDurationSlider->setRange(50, 1000);
+    grainDurationSlider->setValue(100);
+    connect(grainDurationSlider, &QSlider::sliderReleased, 
+            this, &SynthUI::onGrainDurationReleased);
+    connect(grainDurationSlider, &QSlider::valueChanged, 
+            this, &SynthUI::onGrainDurationValueChanged);
+    sliderLayout->addWidget(grainDurationLabel);
+    sliderLayout->addWidget(grainDurationSlider);
+    grainDurationSlider->setEnabled(false); 
+
+    grainPitchLabel = new QLabel("Grain Pitch", this);
+    grainPitchSlider = new QSlider(Qt::Horizontal, this);
+    grainPitchSlider->setRange(1, 20);
+    grainPitchSlider->setValue(10);
+    connect(grainPitchSlider, &QSlider::sliderReleased, 
+            this, &SynthUI::onGrainPitchReleased);
+    connect(grainPitchSlider, &QSlider::valueChanged, 
+            this, &SynthUI::onGrainPitchValueChanged);
+    sliderLayout->addWidget(grainPitchLabel);
+    sliderLayout->addWidget(grainPitchSlider);
+    grainPitchSlider->setEnabled(false); 
+
+    overlapLabel = new QLabel("Overlap", this);
+    overlapSlider = new QSlider(Qt::Horizontal, this);
+    overlapSlider->setRange(10, 20);
+    overlapSlider->setValue(15);
+    connect(overlapSlider, &QSlider::sliderReleased, 
+            this, &SynthUI::onOverlapReleased);
+    connect(overlapSlider, &QSlider::valueChanged, 
+            this, &SynthUI::onOverlapValueChanged);
+    sliderLayout->addWidget(overlapLabel);
+    sliderLayout->addWidget(overlapSlider);
+    overlapSlider->setEnabled(false); 
+
+    mainLayout->addLayout(sliderLayout);
 
     // Waveform 
     waveformLabel = new QLabel("Audio Waveform:", this);
@@ -62,71 +146,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainEnvelopeView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(grainEnvelopeView, 1);
 
-    
-    // Sliders
-    QHBoxLayout *sliderLayout = new QHBoxLayout();
-    grainStartLabel = new QLabel("Grain Start", this);
-    grainStartSlider = new QSlider(Qt::Horizontal, this);
-    grainStartSlider->setRange(0,100);
-    grainStartSlider->setValue(0);
-    connect(grainStartSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainStartReleased);
-    connect(grainStartSlider, &QSlider::valueChanged, this, &SynthUI::onGrainStartValueChanged);
-    sliderLayout->addWidget(grainStartLabel);
-    sliderLayout->addWidget(grainStartSlider);
-    grainStartSlider->setEnabled(false); 
-
-    grainDurationLabel = new QLabel("Grain Duration", this);
-    grainDurationSlider = new QSlider(Qt::Horizontal, this);
-    grainDurationSlider->setRange(50, 1000);
-    grainDurationSlider->setValue(100);
-    connect(grainDurationSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainDurationReleased);
-    connect(grainDurationSlider, &QSlider::valueChanged, this, &SynthUI::onGrainDurationValueChanged);
-    sliderLayout->addWidget(grainDurationLabel);
-    sliderLayout->addWidget(grainDurationSlider);
-    grainDurationSlider->setEnabled(false); 
-
-    grainPitchLabel = new QLabel("Grain Pitch", this);
-    grainPitchSlider = new QSlider(Qt::Horizontal, this);
-    grainPitchSlider->setRange(1, 20);
-    grainPitchSlider->setValue(10);
-    connect(grainPitchSlider, &QSlider::sliderReleased, this, &SynthUI::onGrainPitchReleased);
-    connect(grainPitchSlider, &QSlider::valueChanged, this, &SynthUI::onGrainPitchValueChanged);
-    sliderLayout->addWidget(grainPitchLabel);
-    sliderLayout->addWidget(grainPitchSlider);
-    grainPitchSlider->setEnabled(false); 
-
-    overlapLabel = new QLabel("Overlap", this);
-    overlapSlider = new QSlider(Qt::Horizontal, this);
-    overlapSlider->setRange(10, 20);
-    overlapSlider->setValue(15);
-    connect(overlapSlider, &QSlider::sliderReleased, this, &SynthUI::onOverlapReleased);
-    connect(overlapSlider, &QSlider::valueChanged, this, &SynthUI::onOverlapValueChanged);
-    sliderLayout->addWidget(overlapLabel);
-    sliderLayout->addWidget(overlapSlider);
-    overlapSlider->setEnabled(false); 
-
-    mainLayout->addLayout(sliderLayout);
-
-    // Buttons
-    recordButton = new QPushButton("Record", this);
-    connect(recordButton, &QPushButton::clicked, this, &SynthUI::onRecordClicked);
-    recordButton->setEnabled(false); 
-    mainLayout->addWidget(recordButton);
-
-    stopRecordingButton = new QPushButton("Stop Recording", this);
-    connect(stopRecordingButton, &QPushButton::clicked, this, &SynthUI::onStopRecordingClicked);
-    stopRecordingButton->setEnabled(false); 
-    mainLayout->addWidget(stopRecordingButton);
-
-    playButton = new QPushButton("Play Audio", this);
-    connect(playButton, &QPushButton::clicked, this, &SynthUI::onPlayAudioClicked);
-    playButton->setEnabled(false); 
-    mainLayout->addWidget(playButton);
-
-    stopButton = new QPushButton("Stop Audio", this);
-    connect(stopButton, &QPushButton::clicked, this, &SynthUI::onStopAudioClicked);
-    stopButton->setEnabled(false); 
-    mainLayout->addWidget(stopButton);
+    synthPtr = create_synth();
 
     updateEnvelopeDisplay();
     setLayout(mainLayout);
@@ -160,74 +180,94 @@ void SynthUI::onRecordClicked() {
         QMessageBox::warning(this, "Error", "No audio engine available!");
         return;
     }
-    // prompt user for file path
-    QString filePath = QFileDialog::getSaveFileName(this, "Save Recording As", "", "Wav Files (*.wav)");
-    if (filePath.isEmpty()) return;
+    QString filePath = QFileDialog::getSaveFileName(
+            this,
+            tr("Save Recording As"), 
+            QString(), 
+            tr("Wav Files (*.wav)")
+    );
+    if (filePath.isEmpty()) {
+        return;
+    }
 
-    // We might also want to set the format to "wav"
     QByteArray ba = filePath.toUtf8();
-    record(enginePtr, ba.constData()); // a hypothetical function
+    int result = record(enginePtr, ba.constData());
+    if (result != 0) {
+        QMessageBox::critical(this, "Record Error", "Failed to begin recording");
+    } else {
+        recordButton->setEnabled(false);
+        stopRecordingButton->setEnabled(true);
+    }
 }
 
-void SynthUI::onStopRecordClicked() {
+void SynthUI::onStopRecordingClicked() {
     if (!enginePtr) return;
-    stop_recording(enginePtr);
+    int result = stop_recording(enginePtr);
+    if (result != 0) {
+        QMessageBox::critical(this, "Record Error", "Failed to stop recording!");
+    } else {
+        recordButton->setEnable(true);
+        stopRecording->setEnabled(false);
+    }
 }
 
 void SynthUI::onLoadFileClicked() {
     loadedFilePath = QFileDialog::getOpenFileName(
-            this, "Open Audio File", "", "WAV Files (*.wav)"
+            this,
+            tr("Open Audio File"),
+            QString(),
+            tr("WAV Files (*.wav)")
     );
-    //onStopAudioClicked();
-    // generate_grain_envelope(synthPtr, 2048);
+
+    if (loadFilePath.isEmpty()) {
+        return;
+    }
+
+    if (!synthPtr) {
+        QMessageBox::warning(this, "Error", "No synth created!");
+        return;
+    }
+    int result = load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
+    if (result != 0) {
+        QMessageBox::critical(this, "Load Error", "Failed to load WAV");
+        return;
+    }
+
+    generate_grain_envelope(synthPtr, 2048);
+    
     grainStartSlider->setEnabled(true); 
     grainDurationSlider->setEnabled(true); 
     grainPitchSlider->setEnabled(true); 
     overlapSlider->setEnabled(true); 
 
     playButton->setEnabled(true); 
+    recordButton->setEnabled(true);
 
     grainStartSlider->setValue(0);
     grainDurationSlider->setValue(100);
     grainPitchSlider->setValue(10);
     overlapSlider->setValue(15);
 
-    if (!loadedFilePath.isEmpty()) {
-        if (!synthPtr) {
-            // Do something?
-            return;
-        }
-        load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
-        SourceArray array = get_source_array(synthPtr);
-        float arrayLength = array.length;
-        std::vector<float> fullSamples(arrayLength);
-        // int sampleRate = get_sample_rate(synthPtr);
-        // int channels = get_total_channels(synthPtr);
-        // int totalMilliseconds = ((arrayLength / channels) / sampleRate) * 1000;
-        // grainDurationSlider->setRange(100, totalMilliseconds);
-        // grainDurationSlider->setValue(totalMilliseconds / 2 + 100);
-
-        for (size_t i = 0; i < array.length; ++i) {
-            fullSamples[i] = array.data[i];
-        }
-        free_source_array(array);
-        downsampleWaveform(fullSamples, m_downsampledWaveform, 2048);
-        drawFullWaveformOnce();
-        updateGrainSelectionRect();
+    SourceArray array = get_source_array(synthPtr);
+    std::vector<float> fullSamples(array.length);
+    for (size_t i = 0; i < array.length; ++i) {
+        fullSamples[i] = array.data[i];
     }
+    free_source_array(array);
+
+    downsampleWaveform(fullSamples, m_downsampledWaveform, 2048);
+    drawFullWaveformOnce();
+    updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainStartReleased() {
+    enginePtr = create_audio_engine(synthPtr);
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
-    if (!synthPtr) {        // Do something?
-        return;
-    }
     set_grain_start(synthPtr, normalizedStart);
-    if (isPlaying == true) {
+    if (isPlaying) {
         onPlayAudioClicked();
     }
-    //updateGrainSelectionRect();
 }
 void SynthUI::onGrainStartValueChanged() {
     // Convert the 0 - 100 into a clock timer... somehow.
@@ -242,15 +282,10 @@ void SynthUI::onGrainStartValueChanged() {
 
 void SynthUI::onGrainDurationReleased() {
     int duration = grainDurationSlider->value();
-    if (!synthPtr) {
-        // Do something?
-        return;
-    }
     set_grain_duration(synthPtr, duration);
-    if (isPlaying == true) {
+    if (isPlaying) {
         onPlayAudioClicked();
     }
-    // updateGrainSelectionRect();
 }
 void SynthUI::onGrainDurationValueChanged() {
     int value = grainDurationSlider->value();
@@ -313,22 +348,22 @@ void SynthUI::onPlayAudioClicked() {
         synthPtr = create_synth();
     }
     if (!enginePtr) {
-        enginePtr = create_audio_engine(synthPtr);
+        QMessageBox::critical(this, "Audio Error", "Failed to create audio engine!");
+        return;
     }
-    stopButton->setEnabled(true); 
-    playButton->setEnabled(false); 
-
     start_scheduler(synthPtr);
-    // re-create the stream if necessary or if the Rust code
-    // can handle it automatically, just call start
+
     int result = audio_engine_start(enginePtr);
     if (result != 0) {
-        stop_scheduler(synthPtr);
         QMessageBox::critical(this, "Audio Playback Error",
-                              "Failed to start audio playback. Please check your audio device.");
+                "Failed to start audio playback. Please check your audio device.");
+        stop_scheduler(synthPtr);
+        return;
     }
 
     isPlaying = true;
+    playButton->setEnabled(false); 
+    stopButton->setEnabled(true); 
 
     float normalizedStart = static_cast<float>(grainStartSlider->value()) / 100.0f;
     float normalizedPitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
@@ -337,28 +372,19 @@ void SynthUI::onPlayAudioClicked() {
     set_params(
         synthPtr,
         normalizedStart,
-        grainDurationSlider->value(),
+        static_cast<size_t>(grainDurationSlider->value()),
         normalizedOverlap,
         normalizedPitch
     );
 }
 
 void SynthUI::onStopAudioClicked() {
+    if (!enginePtr) return;
+    stop_scheduler(synthPtr);
+    audio_engine_stop(enginePtr);
     isPlaying = false;
     stopButton->setEnabled(false); 
     playButton->setEnabled(true); 
-    if (!synthPtr) {
-        // Handle better?
-        audio_engine_stop(enginePtr);
-        return;
-    }
-
-    stop_scheduler(synthPtr);
-    audio_engine_stop(enginePtr);
-    //destroy_audio_engine(enginePtr);
-    //destroy_synth(synthPtr);
-    //enginePtr = nullptr;
-    //synthPtr = nullptr;
 }
 
 void SynthUI::drawFullWaveformOnce(){
@@ -385,8 +411,7 @@ void SynthUI::drawFullWaveformOnce(){
     }
 
     m_waveformPathItem->setPath(path);
-    m_waveformPathItem->setPen(QPen(Qt::blue)); // color, thickness, etc.
-
+    m_waveformPathItem->setPen(QPen(Qt::blue));
     waveformScene->setSceneRect(0, 0, sceneWidth, sceneHeight);
 }
 void SynthUI::updateGrainSelectionRect()
@@ -400,7 +425,6 @@ void SynthUI::updateGrainSelectionRect()
     free_source_array(array);
 
     if (totalSamples == 0) {
-        // no file loaded, hide or set rect to 0
         m_grainRectItem->setRect(0,0,0,0);
         return;
     }
@@ -409,26 +433,19 @@ void SynthUI::updateGrainSelectionRect()
     double sceneHeight = waveformView->height();
 
     double fractionStart = static_cast<double>(grainStartSlider->value()) / 100.0;
-    // grainDurationSlider is, say, 100..10000 => treat it as a # of samples?
-    // We'll interpret it as "grainDuration" samples, so fractionDur = grainDuration / totalSamples
     int sample_rate = get_sample_rate(synthPtr);
     double grainDurationSamples = static_cast<double>(grainDurationSlider->value()) / 1000.0 * sample_rate;
-    double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
 
-    // clamp fractionDur so it can't exceed the total
+    double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
     if (fractionDur > 1.0) fractionDur = 1.0;
 
-    // Compute final positions in the scene
     double startX = fractionStart * sceneWidth;
     double widthX = fractionDur   * sceneWidth;
-
-    // Bound them
     if (startX < 0) startX = 0;
     if ((startX + widthX) > sceneWidth) {
         widthX = sceneWidth - startX;
     }
 
-    // Move/resize the rectangle
     m_grainRectItem->setRect(startX, 0, widthX, sceneHeight);
 }
 

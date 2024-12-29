@@ -15,12 +15,14 @@
 #include <QDialog>
 #include <QSpingBox>
 #include <QComboBox>
+#include <vector>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
     typedef struct GranularSynth GranularSynth;
     typedef struct AudioEngine AudioEngine;
+
     typedef struct SourceArray {
         const float* data;
         size_t length;
@@ -42,14 +44,27 @@ extern "C" {
     void audio_engine_stop(AudioEngine* ptr);
     void destroy_audio_engine(AudioEngine* ptr);
 
-    void set_sample_rate(AudioEngine* ptr, uint32_t sr);
+    void set_sample_rate(AudioEngine* ptr, unsigned int sr);
     void set_file_format(AudioEngine* ptr, const char* fmt);
-    void set_bit_depth(AudioEngine* ptr, uint16_t bit_depth);
-    void set_bit_rate(AudioEngine* ptr, uint32_t bitrate);
-    void set_flac_compression(AudioEngine* ptr, uint8_t level);
+    void set_bit_depth(AudioEngine* ptr, unsigned short bit_depth);
+    void set_bit_rate(AudioEngine* ptr, unsigned int bitrate);
+    void set_flac_compression(AudioEngine* ptr, unsigned char level);
+
+    typedef struct DeviceInfo {
+        size_t index;
+        const char* name;
+    } DeviceInfo;
+
+    typedef struct DeviceList {
+        const DeviceInfo* devices;
+        size_t count;
+    } DeviceList;
+
+
+    DeviceList get_output_devices(AudioEngine* ptr);
+    void free_device_list(DeviceList list);
 
     int set_output_device(AudioEngine* ptr, size_t index);
-    void get_output_devices(AudioEngine* ptr);
     int set_default_output_device(AudioEngine* ptr);
     char* get_default_output_device(AudioEngine* ptr);
 
@@ -83,6 +98,9 @@ extern "C" {
 } // extern "C"
 #endif
 
+class QGraphicsPathItem;
+class QGraphicsRectItem;
+
 class SynthUI : public QWidget {
     Q_OBJECT
     //Q_DISABLE_COPY(SynthUI)
@@ -114,7 +132,9 @@ private:
 
     std::vector<float> m_downsampledWaveform;
     void downsampleWaveform(const std::vector<float>& fullData,
-                        std::vector<float>& outDownsampled, size_t targetSize);
+                            std::vector<float>& outDownsampled,
+                            size_t targetSize);
+
     QGraphicsPathItem* m_waveformPathItem = nullptr;
     QGraphicsRectItem* m_grainRectItem = nullptr;
 
@@ -151,19 +171,17 @@ private:
 
     void updateWaveformDisplay();
     void updateEnvelopeDisplay();
-    void drawGrainSelectionRect(
-        QGraphicsScene* scene,
-        double sceneWidth,
-        double sceneHeight,
-        size_t grainStartSample,
-        size_t grainDuration,
-        size_t totalSamples
-    );
+    void drawGrainSelectionRect(QGraphicsScene* scene,
+                                double sceneWidth,
+                                double sceneHeight,
+                                size_t grainStartSample,
+                                size_t grainDuration,
+                                size_t totalSamples);
     void drawFullWaveformOnce();
     void updateGrainSelectionRect();
-    void resizeEvent(QResizeEvent* event);
+    void resizeEvent(QResizeEvent* event) override;
 
-    bool isPlaying;
+    bool isPlaying = false;
 };
 
 #endif // SYNTHUI_H
