@@ -176,7 +176,7 @@ fn dummy_placeholder() -> WavWriter<BufWriter<File>> {
 // -------------------------------------
 pub struct AudioEngine {
     synth: Arc<GranularSynth>,
-    output_device: cpal::platform::Device,
+    output_device: Option<cpal::platform::Device>,
     stream: Option<cpal::Stream>,
     export_settings: ExportSettings,
     is_recording: bool,
@@ -190,11 +190,10 @@ impl AudioEngine {
         ) -> Self {
         let host = cpal::default_host();
         let default_output_device = match host.default_output_device() {
-            Some(device) => device,
+            Some(device) => Some(device),
             None => {
-                // Either return a Result or panic! 
-                eprintln!("No default output device found! Panicking...");
-                panic!("No default output device found!");
+                eprintln!("No default output device found!");
+                None
             }
         };
         AudioEngine {
@@ -278,7 +277,7 @@ impl AudioEngine {
         let host = cpal::default_host();
         let devices = host.output_devices().map_err(|e| e.to_string())?;
         let dev = devices.skip(index).next().ok_or("Invalid device index")?;
-        self.output_device = dev;
+        self.output_device = Some(dev);
         Ok(())
     }
 
@@ -287,14 +286,17 @@ impl AudioEngine {
         let default_dev = host
             .default_output_device()
             .ok_or("No default output device found!")?;
-        self.output_device = default_dev;
+        self.output_device = Some(default_dev);
         Ok(())
     }
 
     pub fn get_default_output_device(&self) -> String {
         self.output_device
-            .name()
-            .unwrap_or("Unknown device".to_string())
+            .as_ref()
+            .map(|device| device
+                .name()
+                .unwrap_or_else(|_| "Unknown device".to_string()))
+            .unwrap_or_else(|| "No device available".to_string())
     }
 
     // ----------------------
@@ -305,7 +307,13 @@ impl AudioEngine {
         if let Some(existing) = self.stream.take() {
             drop(existing);
         }
-        let output_device = &self.output_device;
+        let output_device = match &self.output_device {
+            Some(device) => device,
+            None => {
+                println!("No output device available");
+                return -1;
+            }
+        };
         // Perhaps here build the config based on the user settings?
         let config = match output_device.default_output_config() {
             Ok(config) => config,
@@ -1092,14 +1100,14 @@ pub extern "C" fn set_output_device(
 
 #[repr(C)]
 pub struct DeviceInfo {
-    index: usize,
-    name: *const c_char,
+    pub index: usize,
+    pub name: *const c_char,
 }
 
 #[repr(C)]
 pub struct DeviceList {
-    devices: *const DeviceInfo,
-    count: usize,
+    pub devices: *const DeviceInfo,
+    pub count: usize,
 }
 
 #[no_mangle]
@@ -1123,8 +1131,6 @@ pub extern "C" fn get_output_devices(
         }).collect();
     let ptr = device_infos.as_mut_ptr();
     let count = device_infos.len();
-
-    // We must forget device_infos so it's not freed at the end of scope
     std::mem::forget(device_infos);
 
     DeviceList { devices: ptr, count }

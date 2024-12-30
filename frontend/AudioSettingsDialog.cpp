@@ -19,7 +19,10 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine)
     outputDeviceComboBox = new QComboBox(this);
     mainLayout->addWidget(outputDeviceComboBox);
 
-    DeviceList deviceList;
+    DeviceList deviceList{};
+    deviceList.devices = nullptr;
+    deviceList.count   = 0;
+
     if (enginePtr) {
         deviceList = get_output_devices(enginePtr);
         if (deviceList.devices && deviceList.count > 0) {

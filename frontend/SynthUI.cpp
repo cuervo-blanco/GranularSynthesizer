@@ -16,7 +16,6 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-
     // Buttons
     loadFileButton = new QPushButton("Load WAV", this);
     connect(loadFileButton, &QPushButton::clicked, 
@@ -172,7 +171,14 @@ SynthUI::~SynthUI() {
 
 void SynthUI::onAudioSettingsClicked() {
     AudioSettingsDialog dialog(this, enginePtr);
-    dialog.exec();
+    if (dialog.exec() == QDialog::Accepted) {
+        // Now user has chosen a device
+        int ret = audio_engine_start(enginePtr);
+        if (ret != 0) {
+            QMessageBox::critical(this, "Engine Error", "Engine failed to start");
+            return;
+        }
+    }
 }
 
 void SynthUI::onRecordClicked() {
@@ -261,7 +267,6 @@ void SynthUI::onLoadFileClicked() {
 }
 
 void SynthUI::onGrainStartReleased() {
-    enginePtr = create_audio_engine(synthPtr);
     int value = grainStartSlider->value();
     float normalizedStart = static_cast<float>(value) / 100.0f;
     set_grain_start(synthPtr, normalizedStart);
