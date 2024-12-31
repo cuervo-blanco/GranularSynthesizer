@@ -19,12 +19,19 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine)
     outputDeviceComboBox = new QComboBox(this);
     mainLayout->addWidget(outputDeviceComboBox);
 
+
+
     DeviceList deviceList{};
     deviceList.devices = nullptr;
     deviceList.count   = 0;
 
     if (enginePtr) {
-        deviceList = get_output_devices(enginePtr);
+        DeviceList deviceList = get_output_devices(enginePtr);
+        qDebug() << "deviceList.count =" << deviceList.count;
+        const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
+        for (size_t i = 0; i < deviceList.count; i++) {
+            printf("%s", arr[i].name);
+        }
         if (deviceList.devices && deviceList.count > 0) {
             const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
             for (size_t i = 0; i < deviceList.count; i++) {

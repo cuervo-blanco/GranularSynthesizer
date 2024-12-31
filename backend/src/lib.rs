@@ -158,6 +158,7 @@ pub enum Writers {
     // In the future, we could add Mp3Writer(...), FlacWriter(...), etc.
 }
 
+#[allow(dead_code)]
 fn dummy_placeholder() -> WavWriter<BufWriter<File>> {
     let temp_file = std::fs::File::create("/dev/null")
         .expect("Failed to create a dummy file");
@@ -179,8 +180,8 @@ pub struct AudioEngine {
     output_device: Option<cpal::platform::Device>,
     stream: Option<cpal::Stream>,
     export_settings: ExportSettings,
-    is_recording: bool,
-    writer: Option<Arc<Mutex<Writers>>>,
+    is_recording: Arc<Mutex<bool>>,
+    writer: Arc<Mutex<Option<Writers>>>,
 }
 
 impl AudioEngine {
@@ -201,8 +202,8 @@ impl AudioEngine {
             output_device: default_output_device,
             stream: None,
             export_settings,
-            is_recording: false,
-            writer: None,
+            is_recording: Arc::new(Mutex::new(false)),
+            writer: Arc::new(Mutex::new(None)),
         }
     }
     // ---------------
@@ -329,8 +330,10 @@ impl AudioEngine {
         let receiver_for_callback = Arc::clone(&self.synth.grain_receiver);
 
         // For recording
-        let writer_for_callback = self.writer.clone();
-        let is_recording_for_callback = self.is_recording;
+        let writer_for_callback = Arc::clone(&self.writer);
+
+        let is_recording_for_callback = self.is_recording.clone();
+        let is_recording_clone = Arc::clone(&is_recording_for_callback);
 
         let stream = match output_device.build_output_stream(
             &config.into(),
@@ -356,22 +359,29 @@ impl AudioEngine {
                 }
                 grains.retain(|g| !g.is_finished());
 
+                let is_recording = is_recording_clone.lock().unwrap();
+                let mut guard = writer_for_callback.lock().unwrap();
+
                 // Recording
-                if is_recording_for_callback {
-                    if let Some(writer_arc) = &writer_for_callback {
-                        let mut writer_lock = writer_arc.lock().unwrap();
-                        match &mut *writer_lock {
+                if *is_recording {
+                    if let Some(ref mut writer) = *guard {
+                        match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
+                                println!("Found WavWriter");
                                 for &sample in data.iter() {
                                     // Convert f32 -> i16. 
-                                    // Could do float WAV directly if you want "SampleFormat::Float"
                                     let sample_i16 = (sample * i16::MAX as f32) as i16;
+                                    if sample_i16 != 0 {
+                                        println!("Recording a non-zero sample: {}", sample_i16);
+                                    }
                                     if let Err(e) = wav_writer.write_sample(sample_i16) {
                                         eprintln!("Failed to write sample: {}", e);
                                     }
                                 }
                             }
                         }
+                    } else {
+                        println!("writer_for_callback == None, so no actual recording possible");
                     }
                 }
             },
@@ -406,11 +416,18 @@ impl AudioEngine {
     // RECORDING
     // ----------------------
     pub fn record(&mut self, output_path: &str) -> Result<(), String> { 
-         if self.is_recording {
-             return Err("Already recording!".to_string());
-         }
+        let mut guard = self.writer.lock().unwrap();
+        if guard.is_some() {
+            return Err("Already recording!".to_string());
+        }
+        let mut is_recording = self.is_recording.lock().unwrap();
+        if *is_recording {
+            return Err("Already recording!".to_string());
+        }
+        println!("Called record() with path={}", output_path);
          match self.export_settings.format.as_str() {
              "wav" => {
+                 println!("Creating WavWriter for WAV...");
                 let spec = hound::WavSpec {
                     channels: self.export_settings.channels,
                     sample_rate: self.export_settings.sample_rate,
@@ -424,7 +441,7 @@ impl AudioEngine {
                 let bw = BufWriter::new(file);
                 let wav_writer = hound::WavWriter::new(bw, spec)
                     .map_err(|e| e.to_string())?;
-                self.writer = Some(Arc::new(Mutex::new(Writers::WavWriter(wav_writer))));
+                 *guard = Some(Writers::WavWriter(wav_writer));
             },
             "mp3" => {
                 return Err("MP3 recording not implemented yet.".to_string());
@@ -437,22 +454,21 @@ impl AudioEngine {
             },
          };
 
-         self.is_recording = true;
+         
+         *is_recording = true;
 
          Ok(())
     }
 
     pub fn stop_recording(&mut self) -> Result<(), String> {
-        if !self.is_recording {
+        let mut is_recording = self.is_recording.lock().unwrap();
+        if !*is_recording {
             return Err("Not currently recording!".to_string());
         }
-        self.is_recording = false;
-
         // Finalize the writer
-        if let Some(writer_arc) = self.writer.take() {
-            let mut writer_lock = writer_arc.lock().unwrap();
-            let writer = std::mem::replace(&mut *writer_lock, Writers::WavWriter(dummy_placeholder()));
-
+        let mut guard = self.writer.lock().unwrap();
+        if let Some(writer) = guard.take() {
+            //let writer = std::mem::replace(&mut writer_arc, &mut Writers::WavWriter(dummy_placeholder()));
             match writer {
                 Writers::WavWriter(wav_writer) => {
                     wav_writer.finalize().map_err(|e| e.to_string())?;
@@ -460,6 +476,7 @@ impl AudioEngine {
             }
         }
 
+        *is_recording = false;
         Ok(())
     }
 

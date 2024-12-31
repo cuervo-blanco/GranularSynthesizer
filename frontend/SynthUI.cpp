@@ -146,6 +146,8 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     mainLayout->addWidget(grainEnvelopeView, 1);
 
     synthPtr = create_synth();
+    enginePtr = create_audio_engine(synthPtr);
+    set_default_output_device(enginePtr);
 
     updateEnvelopeDisplay();
     setLayout(mainLayout);
@@ -172,7 +174,6 @@ SynthUI::~SynthUI() {
 void SynthUI::onAudioSettingsClicked() {
     AudioSettingsDialog dialog(this, enginePtr);
     if (dialog.exec() == QDialog::Accepted) {
-        // Now user has chosen a device
         int ret = audio_engine_start(enginePtr);
         if (ret != 0) {
             QMessageBox::critical(this, "Engine Error", "Engine failed to start");
@@ -186,6 +187,15 @@ void SynthUI::onRecordClicked() {
         QMessageBox::warning(this, "Error", "No audio engine available!");
         return;
     }
+    //stop_scheduler(synthPtr);
+    //audio_engine_stop(enginePtr);
+    //destroy_audio_engine(enginePtr);
+    //enginePtr = nullptr;
+
+    //enginePtr = create_audio_engine(synthPtr);
+    //audio_engine_start(enginePtr);
+    //start_scheduler(synthPtr);
+
     QString filePath = QFileDialog::getSaveFileName(
             this,
             tr("Save Recording As"), 
@@ -198,6 +208,9 @@ void SynthUI::onRecordClicked() {
 
     QByteArray ba = filePath.toUtf8();
     int result = record(enginePtr, ba.constData());
+    if (result == 0) {
+        printf("Sucessfully started recording");
+    }
     if (result != 0) {
         QMessageBox::critical(this, "Record Error", "Failed to begin recording");
     } else {
@@ -209,6 +222,9 @@ void SynthUI::onRecordClicked() {
 void SynthUI::onStopRecordingClicked() {
     if (!enginePtr) return;
     int result = stop_recording(enginePtr);
+    if (result == 0) {
+        printf("Sucessfully stopped recording");
+    }
     if (result != 0) {
         QMessageBox::critical(this, "Record Error", "Failed to stop recording!");
     } else {
