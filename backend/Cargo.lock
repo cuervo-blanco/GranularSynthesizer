@@ -46,6 +46,8 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "dasp",
+ "dasp_interpolate",
+ "dasp_ring_buffer",
  "dasp_signal",
  "hound",
  "rand",

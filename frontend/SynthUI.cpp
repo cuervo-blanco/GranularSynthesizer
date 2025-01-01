@@ -249,7 +249,12 @@ void SynthUI::onLoadFileClicked() {
         QMessageBox::warning(this, "Error", "No synth created!");
         return;
     }
-    int result = load_audio_from_file(synthPtr, loadedFilePath.toStdString().c_str());
+    int masterSampleRate = get_master_sample_rate(enginePtr);
+    int result = load_audio_from_file(
+            synthPtr, 
+            loadedFilePath.toStdString().c_str(), 
+            masterSampleRate
+    );
     if (result != 0) {
         QMessageBox::critical(this, "Load Error", "Failed to load WAV");
         return;

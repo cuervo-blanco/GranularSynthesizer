@@ -37,7 +37,7 @@ extern "C" {
     GranularSynth* create_synth();
     void destroy_synth(GranularSynth* ptr);
 
-    int load_audio_from_file(GranularSynth* ptr, const char* file_path);
+    int load_audio_from_file(GranularSynth* ptr, const char* file_path, unsigned int master_sample_rate);
     void generate_grain_envelope(GranularSynth* ptr, size_t size);
 
     AudioEngine* create_audio_engine(GranularSynth* ptr);
@@ -45,6 +45,7 @@ extern "C" {
     void audio_engine_stop(AudioEngine* ptr);
     void destroy_audio_engine(AudioEngine* ptr);
 
+    int get_master_sample_rate(AudioEngine* ptr);
     void set_sample_rate(AudioEngine* ptr, unsigned int sr);
     void set_file_format(AudioEngine* ptr, const char* fmt);
     void set_bit_depth(AudioEngine* ptr, unsigned short bit_depth);

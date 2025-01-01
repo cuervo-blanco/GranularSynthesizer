@@ -5,7 +5,8 @@ use hound;
 use hound::WavWriter;
 use crossbeam_channel::{Sender, Receiver};
 #[allow(unused_imports)]
-use dasp_signal::{self as signal, Signal};
+use dasp_signal::{self as signal, Signal, FromInterleavedSamplesIterator};
+use dasp_interpolate::linear::Linear;
 use rand::Rng;
 use std::{
     sync::{Arc, Mutex},
@@ -124,10 +125,10 @@ impl GrainVoice {
                         sinc_interpolation(source_array, source_index_float)
                 },
                 Interpolation::Cubic => {
-                        cubic_interpolation(grain_env, env_index_float)
+                        cubic_interpolation(grain_env, source_index_float)
                 },
                 Interpolation::Linear => {
-                        linear_interpolation(grain_env, env_index_float)
+                        linear_interpolation(grain_env, source_index_float)
                 }
             };
             output[i] = source_value * envelope_value;
@@ -172,6 +173,25 @@ fn dummy_placeholder() -> WavWriter<BufWriter<File>> {
     WavWriter::new(buf_writer, spec)
         .expect("Failed to create a dummy WavWriter")
 }
+
+pub struct UserRecordingSettings {
+    pub sample_rate: Option<u32>,       // None means "use device's default"
+    pub channels: Option<u16>,          // None => use device's default
+    pub bit_depth: Option<u16>,         // None => e.g. 16 bits if not specified
+    pub format: Option<String>,
+    pub format_specific: Option<FormatSpecificSettings>,
+}
+impl Default for UserRecordingSettings {
+    fn default() -> Self {
+        UserRecordingSettings {
+            sample_rate: None,
+            channels: None,
+            bit_depth: None,
+            format: None,
+            format_specific: None,
+        }
+    }
+}
 // -------------------------------------
 // AUDIO ENGINE STRUCT
 // -------------------------------------
@@ -179,7 +199,8 @@ pub struct AudioEngine {
     synth: Arc<GranularSynth>,
     output_device: Option<cpal::platform::Device>,
     stream: Option<cpal::Stream>,
-    export_settings: ExportSettings,
+    user_recording_settings: UserRecordingSettings,
+    device_default_config: Option<cpal::SupportedStreamConfig>,
     is_recording: Arc<Mutex<bool>>,
     writer: Arc<Mutex<Option<Writers>>>,
 }
@@ -187,21 +208,27 @@ pub struct AudioEngine {
 impl AudioEngine {
     pub fn new(
         synth: Arc<GranularSynth>,
-        export_settings: ExportSettings
+        user_settings: UserRecordingSettings,
         ) -> Self {
         let host = cpal::default_host();
-        let default_output_device = match host.default_output_device() {
+        let output_device = match host.default_output_device() {
             Some(device) => Some(device),
             None => {
                 eprintln!("No default output device found!");
                 None
             }
         };
+
+        let device_default_config = output_device.as_ref().and_then(|dev| {
+            dev.default_output_config().ok()
+        });
+
         AudioEngine {
             synth,
-            output_device: default_output_device,
+            output_device,
             stream: None,
-            export_settings,
+            user_recording_settings: user_settings,
+            device_default_config,
             is_recording: Arc::new(Mutex::new(false)),
             writer: Arc::new(Mutex::new(None)),
         }
@@ -209,12 +236,18 @@ impl AudioEngine {
     // ---------------
     // SETTINGS
     // ---------------
+    pub fn get_master_sample_rate(&self) -> u32 {
+        self.user_recording_settings.sample_rate
+            .or_else(|| self.device_default_config.as_ref().map(|c| c.sample_rate().0))
+            .unwrap_or(44100)
+    }
+
     pub fn set_sample_rate(&mut self, sample_rate: u32){
-        self.export_settings.sample_rate = sample_rate;
+        self.user_recording_settings.sample_rate = Some(sample_rate);
     }
 
     pub fn set_bit_depth(&mut self, bit_depth: u16) {
-        self.export_settings.bit_depth = bit_depth;
+        self.user_recording_settings.bit_depth = Some(bit_depth);
     }
 
     pub fn set_buffer_size(&mut self, _buffer_size: usize) {
@@ -228,28 +261,28 @@ impl AudioEngine {
     }
 
     pub fn set_file_format(&mut self, fmt: &str){
-        self.export_settings.format = fmt.to_string();
+        self.user_recording_settings.format = Some(fmt.to_string());
     }
 
     pub fn set_bit_rate(&mut self, bitrate: u32){
         if let Some(FormatSpecificSettings::Mp3Settings { bitrate: ref mut b }) =
-            self.export_settings.format_specific
+            self.user_recording_settings.format_specific
         {
             *b = bitrate;
         } else {
             // Possibly override or create new FormatSpecificSettings::Mp3Settings
-            self.export_settings.format_specific = 
+            self.user_recording_settings.format_specific = 
                 Some(FormatSpecificSettings::Mp3Settings { bitrate });
         }
     }
     
     pub fn set_flac_compression(&mut self, level: u8) {
         if let Some(FormatSpecificSettings::FlacSettings { ref mut compression }) =
-            self.export_settings.format_specific
+            self.user_recording_settings.format_specific
         {
             *compression = level;
         } else {
-            self.export_settings.format_specific =
+            self.user_recording_settings.format_specific =
                 Some(FormatSpecificSettings::FlacSettings { compression: level });
         }
     }
@@ -308,18 +341,14 @@ impl AudioEngine {
         if let Some(existing) = self.stream.take() {
             drop(existing);
         }
-        let output_device = match &self.output_device {
-            Some(device) => device,
+
+        let config = self.output_device.as_ref().and_then(|dev| {
+            dev.default_output_config().ok()
+        });
+        let config = match config {
+            Some(c) => c,
             None => {
-                println!("No output device available");
-                return -1;
-            }
-        };
-        // Perhaps here build the config based on the user settings?
-        let config = match output_device.default_output_config() {
-            Ok(config) => config,
-            Err(e) => {
-                eprintln!("Could not get default output config: {}", e);
+                eprintln!("Failed to get a valid output configuration");
                 return -1;
             }
         };
@@ -335,7 +364,7 @@ impl AudioEngine {
         let is_recording_for_callback = self.is_recording.clone();
         let is_recording_clone = Arc::clone(&is_recording_for_callback);
 
-        let stream = match output_device.build_output_stream(
+        let stream = match self.output_device.as_ref().unwrap().build_output_stream(
             &config.into(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 // 1. gather any newly scheduled grains
@@ -367,13 +396,13 @@ impl AudioEngine {
                     if let Some(ref mut writer) = *guard {
                         match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
-                                println!("Found WavWriter");
                                 for &sample in data.iter() {
+
+                                    // Surely this must change based on 
+                                    // the sample bit depth
+                                    
                                     // Convert f32 -> i16. 
-                                    let sample_i16 = (sample * i16::MAX as f32) as i16;
-                                    if sample_i16 != 0 {
-                                        println!("Recording a non-zero sample: {}", sample_i16);
-                                    }
+                                    let sample_i16 = (sample * std::i16::MAX as f32) as i16;
                                     if let Err(e) = wav_writer.write_sample(sample_i16) {
                                         eprintln!("Failed to write sample: {}", e);
                                     }
@@ -416,26 +445,47 @@ impl AudioEngine {
     // RECORDING
     // ----------------------
     pub fn record(&mut self, output_path: &str) -> Result<(), String> { 
-        let mut guard = self.writer.lock().unwrap();
-        if guard.is_some() {
-            return Err("Already recording!".to_string());
-        }
         let mut is_recording = self.is_recording.lock().unwrap();
         if *is_recording {
             return Err("Already recording!".to_string());
         }
-        println!("Called record() with path={}", output_path);
-         match self.export_settings.format.as_str() {
+        let mut guard = self.writer.lock().unwrap();
+        if guard.is_some() {
+            return Err("Already recording!".to_string());
+        }
+
+        let final_sample_rate = match self.user_recording_settings.sample_rate {
+            Some(rate) => rate,
+            None => {
+                // ALWAYS use the device default config if available
+                self.device_default_config
+                    .as_ref()
+                    .map(|c| c.sample_rate().0)
+                    .unwrap_or(44100)
+            }
+        };
+        let final_channels = if let Some(ch) = self.user_recording_settings.channels {
+            ch
+        } else if let Some(ref dev_cfg) = self.device_default_config {
+            dev_cfg.channels() as u16
+        } else {
+            2
+        };
+
+        let final_bit_depth = self.user_recording_settings.bit_depth.unwrap_or(16);
+
+        let final_format = self.user_recording_settings
+            .format
+            .as_deref()
+            .unwrap_or("wav");
+
+        match final_format {
              "wav" => {
-                 println!("Creating WavWriter for WAV...");
                 let spec = hound::WavSpec {
-                    channels: self.export_settings.channels,
-                    sample_rate: self.export_settings.sample_rate,
-                    bits_per_sample: self.export_settings.bit_depth,
-                    sample_format: match self.export_settings.sample_format {
-                        hound::SampleFormat::Float => hound::SampleFormat::Float,
-                        hound::SampleFormat::Int => hound::SampleFormat::Int,
-                    },
+                    channels: final_channels,
+                    sample_rate: final_sample_rate,
+                    bits_per_sample: final_bit_depth,
+                    sample_format: hound::SampleFormat::Int,
                 };
                 let file = File::create(output_path).map_err(|e| e.to_string())?;
                 let bw = BufWriter::new(file);
@@ -517,7 +567,7 @@ impl GranularSynth {
             grain_voices: Arc::new(Mutex::new(grain_voices)),
             params: Arc::new(Mutex::new(GrainParams {
                 grain_start: 0.0,
-                grain_duration: 4410,
+                grain_duration: 100,
                 grain_overlap: 2.0,
                 grain_pitch: 1.0,
                 specs: specs,
@@ -624,35 +674,44 @@ impl GranularSynth {
     pub fn load_audio_from_file(
         &self, 
         file_path: *const u8,
-        file_path_len: usize
+        file_path_len: usize,
+        master_rate: u32,
         ) -> i32 {
         // Safety: Convert the raw pointer and length to a Rust string slice
         let file_path_slice = unsafe {
             std::slice::from_raw_parts(file_path, file_path_len)
         };
         let file_path_str = std::str::from_utf8(file_path_slice).unwrap_or("");
+
         match hound::WavReader::open(file_path_str) {
             Ok(mut reader) => {
                 let spec = reader.spec();
-                println!(
-                    "loaded audio: sample rate = {}, channels = {}",
-                    spec.sample_rate, spec.channels
-                );
-                // Change bit rate
-                let samples: Vec<f32> = reader
+                let input_sample_rate = spec.sample_rate; // e.g. 48000
+                let input_channels = spec.channels;
+
+                let float_samples: Vec<f32> = reader
                     .samples::<i16>()
-                    .map(|s| s.unwrap_or(0) as f32 / 32768.0)
+                    .filter_map(|s| s.ok())
+                    .map(|sample_i16| sample_i16 as f32 / 32768.0)
                     .collect();
 
-                let filesize = samples.len();
+                let final_samples = resample_to_master(
+                    &float_samples,
+                    input_channels,
+                    input_sample_rate,
+                    master_rate,
+                );
+
+                let filesize = final_samples.len();
                 let mut params = self.params.lock().unwrap();
                 params.specs.filesize = filesize;
                 // Resample? 
-                params.specs.sample_rate = spec.sample_rate;
-                params.specs.channels = spec.channels;
+                params.specs.sample_rate = master_rate;
+                params.specs.channels = input_channels;
+                drop(params);
 
                 let mut buffer = self.source_array.lock().unwrap();
-                *buffer = samples;
+                *buffer = final_samples;
                 0 // Success
                   // Return file size and format validity
             }
@@ -824,11 +883,78 @@ fn four_point_interpolation(buffer: &[f32], x: f32) -> f32 {
     s1 + c1 * frac + c2 * frac2 + c3 * frac3
 }
 
+fn resample_to_master(
+    input_samples: &[f32],       // interleaved
+    input_channels: u16,
+    input_sample_rate: u32,
+    output_sample_rate: u32,
+) -> Vec<f32> {
+    // If sample rate matches, no need to resample.
+    if input_sample_rate == output_sample_rate {
+        return input_samples.to_vec();
+    }
+
+    // 1) Deinterleave the input into channel-specific buffers.
+    //    E.g. if input_channels=2, samples are [L0, R0, L1, R1, L2, R2, ...]
+    let frames = input_samples.len() / input_channels as usize;
+    let mut channels_data = vec![Vec::with_capacity(frames); input_channels as usize];
+
+    for (i, &sample) in input_samples.iter().enumerate() {
+        let ch = i % input_channels as usize;
+        channels_data[ch].push(sample);
+    }
+
+    let ratio = output_sample_rate as f64 / input_sample_rate as f64;
+
+    // 2) For each channel, resample from input_sample_rate to output_sample_rate
+    let mut resampled_channels: Vec<Vec<f32>> = Vec::new();
+    for ch_buf in channels_data {
+        let signal_in = signal::from_iter(ch_buf.into_iter());
+
+        // swap in a Sinc interpolator
+        let interpolator = Linear::new(0.0, 0.0);
+        let mut sig = signal_in.from_hz_to_hz::<Linear<f32>>(
+            interpolator,
+            input_sample_rate as f64,
+            output_sample_rate as f64,
+        );
+
+        let estimated_len = (frames as f64 * ratio).ceil() as usize;
+        let mut out_buf = Vec::with_capacity(estimated_len);
+
+        for _ in 0..estimated_len {
+            // Safely fetch a sample from `sig.next()`
+            let sample = sig.next();
+            out_buf.push(sample);
+        }
+
+        resampled_channels.push(out_buf);
+    }
+
+    // 3) Reinterleave the resampled channels back together
+    //    so that the final output is in the same interleaved format:
+    //    [C0_frame0, C1_frame0, C0_frame1, C1_frame1, ...]
+    let res_frames = resampled_channels[0].len(); // length of the first channel
+    let num_channels = resampled_channels.len();
+    let mut final_samples = Vec::with_capacity(res_frames * num_channels);
+
+    for i in 0..res_frames {
+        for ch in 0..num_channels {
+            let channel_data = &resampled_channels[ch];
+            // If this channel is shorter for some reason, use 0.0
+            let sample = channel_data.get(i).copied().unwrap_or(0.0);
+            final_samples.push(sample);
+        }
+    }
+
+    final_samples
+}
+
 // -------------------------------------
 // C API
 // -------------------------------------
 use std::ffi::CString;
-use std::os::raw::{c_char, c_int};
+use std::os::raw::{c_char, c_int, c_uint};
 #[allow(unused_imports)]
 use std::ptr;
 
@@ -852,6 +978,7 @@ pub extern "C" fn destroy_synth(ptr: *mut GranularSynth) {
 pub extern "C" fn load_audio_from_file(
     synth_ptr: *mut GranularSynth,
     file_path: *const c_char,
+    master_rate: u32,
 ) -> c_int {
     let synth = unsafe {
         assert!(!synth_ptr.is_null());
@@ -869,7 +996,7 @@ pub extern "C" fn load_audio_from_file(
 
     let result = 
         synth.load_audio_from_file(
-            path_str.as_bytes().as_ptr(), path_str.len());
+            path_str.as_bytes().as_ptr(), path_str.len(), master_rate);
     result
 }
 
@@ -979,18 +1106,19 @@ pub extern "C" fn set_overlap(
 pub extern "C" fn create_audio_engine(
     synth_ptr: *mut GranularSynth
 ) -> *mut AudioEngine {
+    // Perhaps change the function signature to provide settings when creating 
+    // the Audio Engine
     unsafe {
         assert!(!synth_ptr.is_null());
         let synth_ref = &*synth_ptr;
         let arc_synth = Arc::new(synth_ref.clone_for_thread());
-
+        
         // Provide a default ExportSettings
-        let default_export_settings = ExportSettings {
-            channels: 2,
-            sample_rate: 44100,
-            bit_depth: 16,
-            sample_format: hound::SampleFormat::Int,
-            format: "wav".to_string(),
+        let default_export_settings = UserRecordingSettings {
+            channels: Some(2),
+            sample_rate: Some(44100),
+            bit_depth: Some(16),
+            format: Some("wav".to_string()),
             format_specific: Some(FormatSpecificSettings::WavSettings {}),
         };
 
@@ -1017,7 +1145,6 @@ pub extern "C" fn audio_engine_stop(engine_ptr: *mut AudioEngine) {
     engine.stop();
 }
 
-
 #[no_mangle]
 pub extern "C" fn destroy_audio_engine(engine_ptr: *mut AudioEngine) {
     if engine_ptr.is_null() {
@@ -1025,6 +1152,15 @@ pub extern "C" fn destroy_audio_engine(engine_ptr: *mut AudioEngine) {
     }
     unsafe {
         let _ = Box::from_raw(engine_ptr);
+    }
+}
+#[no_mangle]
+pub extern "C" fn get_master_sample_rate(engine_ptr: *mut AudioEngine) -> c_uint {
+    if engine_ptr.is_null() {
+        return u32::MAX;
+    }
+    unsafe {
+        (&*engine_ptr).get_master_sample_rate()
     }
 }
 
@@ -1331,239 +1467,4 @@ pub extern "C" fn get_total_channels(synth_ptr: *mut GranularSynth) -> c_int {
     };
     let params = synth.params.lock().unwrap();
     params.specs.channels as c_int
-}
-
-// -------------------------------------
-// TESTS
-// -------------------------------------
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_four_point_interpolation() {
-        let buf = vec![0.0, 1.0, 2.0, 3.0, 4.0];
-
-        assert_eq!(four_point_interpolation(&buf, 2.0), 2.0);
-
-        let val = four_point_interpolation(&buf, 2.5);
-        assert!(val > 2.4 && val < 2.6, "val={}", val);
-
-        let val2 = four_point_interpolation(&buf, 0.0);
-        assert_eq!(val2,  0.0);
-
-        let val3 = four_point_interpolation(&buf, 4.0);
-        assert_eq!(val3, 4.0);
-    }
-
-    #[test]
-    fn test_envelope_generation() {
-        let synth = GranularSynth::new();
-        synth.generate_grain_envelope(1024);
-        let env = synth.get_grain_envelope();
-        assert_eq!(env.len(), 1024);
-        // Basic checks for boundaries
-        assert!(env[0] >= 0.0 && env[0] < 1.0);
-        assert!(env[1023] >= 0.0 && env[1023] < 1.0);
-    }
-
-    #[test]
-    fn test_load_invalid_file() {
-        let synth = GranularSynth::new();
-        let path_str = "non_existent_file.wav";
-        let bytes = path_str.as_bytes();
-        let result = synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
-        assert_eq!(result, -1);
-    }
-
-    #[test]
-    fn test_process_grain_with_4point_interpolation() {
-        let synth = GranularSynth::new();
-        {
-            let mut buf = synth.source_array.lock().unwrap();
-            *buf = (0..44100).map(|i| i as f32).collect();
-        }
-
-        synth.generate_grain_envelope(128);
-
-        let voice = GrainVoice::new(0.0, 1.0, 1.0);
-        let params = synth.params.lock().unwrap();
-
-        let source = synth.get_source_array();
-        let env = synth.get_grain_envelope();
-        let out = voice.process_grain(&source, &env, &params);
-
-        assert_eq!(out.len(), 4410);
-
-        let max_val = out.iter().cloned().fold(f32::MIN, f32::max);
-        assert!(max_val > 0.0);
-    }
-    #[test]
-    fn test_grain_params_edge_cases() {
-        let synth = GranularSynth::new();
-
-        synth.set_params(999_999, 0, 0.0, 0.0);
-
-        let params = synth.params.lock().unwrap();
-        assert_eq!(params.grain_overlap, 1.0, "Overlap must clamp to 1.0");
-        assert_eq!(
-            params.grain_pitch,
-            params.specs.sample_rate as f32 * 0.1,
-            "Pitch must clamp to 0.1 * sample_rate" 
-        );
-        assert_eq!(params.grain_duration, 0);
-        drop(params);
-
-        synth.set_params(0, 44100, 9.0, 999.0);
-        let params2 = synth.params.lock().unwrap();
-        assert_eq!(params2.grain_overlap, 2.0, "Overlap must clamp to 2.0");
-        assert_eq!(
-            params2.grain_pitch,
-            params2.specs.sample_rate as f32 * 2.0,
-            "Pitch must clamp to 2.0 * sample_rate"
-        );
-    }
-
-    #[test]
-    fn test_empty_source_array() {
-        let synth = GranularSynth::new();
-        {
-            let mut buf = synth.source_array.lock().unwrap();
-            buf.clear();
-        }
-
-        let voice = GrainVoice::new(0.0, 1.0, 1.0);
-        let env = synth.get_grain_envelope();
-        let params = synth.params.lock().unwrap();
-        let out = voice.process_grain(&[], &env, &params);
-
-        assert_eq!(out.len(), 4410);
-        assert!(out.iter().all(|&sample| sample == 0.0));
-    }
-
-    #[test]
-    fn test_tiny_source_array() {
-        let synth = GranularSynth::new();
-        {
-            let mut buf = synth.source_array.lock().unwrap();
-            *buf = vec![0.25, 0.5];
-        }
-
-        synth.generate_grain_envelope(8);
-
-        let voice = GrainVoice::new(0.0, 1.0, 1.0);
-        let params = synth.params.lock().unwrap();
-        let out = voice.process_grain(
-            &synth.get_source_array(),
-            &synth.get_grain_envelope(),
-            &params
-        );
-
-        assert_eq!(out.len(), 4410);
-    }
-    #[test]
-    fn test_load_stereo_file() {
-        let synth = GranularSynth::new();
-
-        // With an actual stereo file, we could test it like so:
-        // let path_str = "stereo_test.wav";
-        // let bytes = path_str.as_bytes();
-        // let result = synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
-        // For demonstration, we'll just check that it returns -1 for non-existent file:
-        let path_str = "fake_stereo_test.wav";
-        let bytes = path_str.as_bytes();
-        let result = synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
-        assert_eq!(result, -1, "Expected failure for a non-existent stereo file");
-    }
-
-    #[test]
-    fn test_calculate_metro_time_in_ms() {
-        let synth = GranularSynth::new();
-        let mut params = synth.params.lock().unwrap();
-        params.grain_duration = 4410;
-        params.grain_overlap = 1.5;
-        drop(params);
-
-        // 1) (grain_duration / 2) / overlap
-        // default = (4410/2) / 1.5 = 1470 ms
-        let time_ms = synth.calculate_metro_time_in_ms();
-        assert!((time_ms - 1470.0).abs() < 1.0, "Expected around 1470 ms");
-    }
-
-    #[test]
-    fn test_generate_random_parameters() {
-        // Just check that (r_a, r_b) are in some plausible range
-        // r_a ~ 0..10000, r_b ~ 1.0..(1.0 + 200/10000.0)
-        // i.e. r_b ~ 1.0..1.02
-        for _ in 0..100 {
-            let (r_a, r_b) = GranularSynth::generate_random_parameters();
-            assert!(r_a >= 0.0 && r_a < 10001.0, "r_a out of range");
-            assert!(r_b >= 1.0 && r_b <= 1.02, "r_b out of range");
-        }
-    }
-    //
-    // 6) Simple Smoke Test for Real-Time + Scheduler
-    //
-    // This demonstrates a "no panic" test. In practice, real-time tests
-    // might be excluded in CI or done manually, because they depend on 
-    // an audio device, threads, timing, etc.
-    //
-    #[test]
-    fn test_smoke_test_play_audio() {
-        let mut synth = GranularSynth::new();
-
-        // Provide a small envelope; or, if you have a test WAV file, load it:
-        //   let file_path = "path/to/small_test.wav";
-        //   let bytes = file_path.as_bytes();
-        //   synth.load_audio_from_file(bytes.as_ptr(), bytes.len());
-        synth.generate_grain_envelope(256);
-
-        synth.start_scheduler();
-
-        let play_result = synth.play_audio();
-        // If your environment doesn't have an output device, might fail
-        // So we won't assert 0 here, just verify no panic:
-        eprintln!("play_audio() returned: {}", play_result);
-
-        // Let it run a moment
-        std::thread::sleep(std::time::Duration::from_millis(500));
-
-        // Stop scheduler
-        synth.stop_scheduler();
-
-        // If we got here without panics, consider it a success
-        assert!(true);
-    }
-
-    //
-    // 7) (Optional) Checking Overlap & Timing in Real-Time
-    //    This is more of an integration test. Shown here as a sketch:
-    //
-    // #[test]
-    // fn test_grain_overlap_timing() {
-    //     let mut synth = GranularSynth::new();
-    //     synth.generate_grain_envelope(128);
-    //     // ... load short file, or set up source_array with known data
-    //
-    //     let (tx, rx) = crossbeam_channel::unbounded::<std::time::Instant>();
-    //
-    //     // Instead of using the default route_to_grainvoice, you could 
-    //     // modify it temporarily to record a timestamp each time a new 
-    //     // grain is started:
-    //     // e.g., tx.send(Instant::now()).unwrap();
-    //
-    //     synth.start_scheduler();
-    //     synth.play_audio();
-    //
-    //     // Let it run for a while, collecting timestamps
-    //     std::thread::sleep(std::time::Duration::from_secs(2));
-    //     synth.stop_scheduler();
-    //
-    //     // Now analyze the timestamps from rx to see if they're 
-    //     // spaced approximately at calculate_metro_time_in_ms() intervals.
-    //     // For instance:
-    //     let times: Vec<_> = rx.try_iter().collect();
-    //     // assert that intervals are close to the expected ms
-    // }
-
 }

@@ -1,7 +1,0 @@
--- This file might not last a long time, depending on the final setup of the
--- project. The idea is to setup a Lua API for users that want to add scripting
--- capabilities to the granular synthesizer. This could either be a homemade
--- scripting language, like "init setup: line 3000ms param: start" or it could
--- just be that we erase this altogether and add a frontend/backend logic
--- for loading Lua scripts that handle stuff in the application. This will might be
--- minimal, but we will see O.O.
