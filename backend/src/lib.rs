@@ -125,10 +125,10 @@ impl GrainVoice {
                         sinc_interpolation(source_array, source_index_float)
                 },
                 Interpolation::Cubic => {
-                        cubic_interpolation(grain_env, source_index_float)
+                        cubic_interpolation(source_array, source_index_float)
                 },
                 Interpolation::Linear => {
-                        linear_interpolation(grain_env, source_index_float)
+                        linear_interpolation(source_array, source_index_float)
                 }
             };
             output[i] = source_value * envelope_value;
@@ -397,10 +397,6 @@ impl AudioEngine {
                         match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
                                 for &sample in data.iter() {
-
-                                    // Surely this must change based on 
-                                    // the sample bit depth
-                                    
                                     // Convert f32 -> i16. 
                                     let sample_i16 = (sample * std::i16::MAX as f32) as i16;
                                     if let Err(e) = wav_writer.write_sample(sample_i16) {
@@ -454,16 +450,17 @@ impl AudioEngine {
             return Err("Already recording!".to_string());
         }
 
-        let final_sample_rate = match self.user_recording_settings.sample_rate {
-            Some(rate) => rate,
-            None => {
-                // ALWAYS use the device default config if available
-                self.device_default_config
-                    .as_ref()
-                    .map(|c| c.sample_rate().0)
-                    .unwrap_or(44100)
-            }
-        };
+        //let final_sample_rate = match self.user_recording_settings.sample_rate {
+            //Some(rate) => rate,
+            //None => {
+                //self.device_default_config
+                    //.as_ref()
+                    //.map(|c| c.sample_rate().0)
+                    //.unwrap_or(48000)
+            //}
+        //};
+        let actual_rate = self.device_default_config.clone().unwrap().sample_rate();
+        println!("Actual rate: {:?}", actual_rate.0);
         let final_channels = if let Some(ch) = self.user_recording_settings.channels {
             ch
         } else if let Some(ref dev_cfg) = self.device_default_config {
@@ -483,7 +480,7 @@ impl AudioEngine {
              "wav" => {
                 let spec = hound::WavSpec {
                     channels: final_channels,
-                    sample_rate: final_sample_rate,
+                    sample_rate: actual_rate.0 * 2,
                     bits_per_sample: final_bit_depth,
                     sample_format: hound::SampleFormat::Int,
                 };
