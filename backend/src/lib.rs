@@ -13,7 +13,7 @@ use std::{
     f32::consts::PI,
     time::{Duration, Instant},
     sync::atomic::AtomicBool,
-    thread,
+    thread::{self, JoinHandle},
     sync::atomic::Ordering,
     fs::File,
     io::BufWriter,
@@ -342,15 +342,20 @@ impl AudioEngine {
             drop(existing);
         }
 
-        let config = self.output_device.as_ref().and_then(|dev| {
-            dev.default_output_config().ok()
-        });
-        let config = match config {
-            Some(c) => c,
-            None => {
-                eprintln!("Failed to get a valid output configuration");
-                return -1;
-            }
+        let num_channels = self.user_recording_settings
+        .channels
+        .unwrap_or_else(|| self.device_default_config
+            .as_ref()
+            .map(|c| c.channels() as u16)
+            .unwrap_or(2));
+
+        let user_rate = self.get_master_sample_rate();
+        let bit_depth = self.user_recording_settings.bit_depth.unwrap_or(16);
+
+        let config = cpal::StreamConfig {
+            channels: num_channels as u16,
+            sample_rate: cpal::SampleRate(user_rate),
+            buffer_size: cpal::BufferSize::Default, // or some user-chosen size
         };
 
         let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
@@ -365,7 +370,7 @@ impl AudioEngine {
         let is_recording_clone = Arc::clone(&is_recording_for_callback);
 
         let stream = match self.output_device.as_ref().unwrap().build_output_stream(
-            &config.into(),
+            &config.clone().into(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 // 1. gather any newly scheduled grains
                 while let Ok(grain_data) = receiver_for_callback.try_recv() {
@@ -375,7 +380,7 @@ impl AudioEngine {
 
                 // 2. fill the audio buffer
                 let mut grains = grains_arc.lock().unwrap();
-                for frame in data.chunks_mut(2) {
+                for frame in data.chunks_mut(num_channels.into()) {
                     let mut mix_sample = 0.0;
                     for g in grains.iter_mut() {
                         mix_sample += g.next_sample();
@@ -396,11 +401,34 @@ impl AudioEngine {
                     if let Some(ref mut writer) = *guard {
                         match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
-                                for &sample in data.iter() {
-                                    // Convert f32 -> i16. 
-                                    let sample_i16 = (sample * std::i16::MAX as f32) as i16;
-                                    if let Err(e) = wav_writer.write_sample(sample_i16) {
-                                        eprintln!("Failed to write sample: {}", e);
+                                match bit_depth {
+                                    16 => {
+                                        for &sample in data.iter() {
+                                            let sample_i16 = (sample * std::i16::MAX as f32) as i16;
+                                            if let Err(e) = wav_writer.write_sample(sample_i16) {
+                                                eprintln!("Failed to write sample (16-bit): {}", e);
+                                            }
+                                        }
+                                    },
+                                    24 => {
+                                        for &sample in data.iter() {
+                                            // Convert f32 -> i32 and shift to 24-bit range
+                                            let sample_i32 = (sample * std::i32::MAX as f32) as i32;
+                                            if let Err(e) = wav_writer.write_sample(sample_i32) {
+                                                eprintln!("Failed to write sample (24-bit): {}", e);
+                                            }
+                                        }
+                                    },
+                                    32 => {
+                                        for &sample in data.iter() {
+                                            let sample_i32 = (sample * std::i32::MAX as f32) as i32;
+                                            if let Err(e) = wav_writer.write_sample(sample_i32) {
+                                                eprintln!("Failed to write sample (32-bit): {}", e);
+                                            }
+                                        }
+                                    },
+                                    _ => {
+                                        eprintln!("Unsupported bit depth: {}", bit_depth);
                                     }
                                 }
                             }
@@ -450,17 +478,17 @@ impl AudioEngine {
             return Err("Already recording!".to_string());
         }
 
-        //let final_sample_rate = match self.user_recording_settings.sample_rate {
-            //Some(rate) => rate,
-            //None => {
-                //self.device_default_config
-                    //.as_ref()
-                    //.map(|c| c.sample_rate().0)
-                    //.unwrap_or(48000)
-            //}
-        //};
-        let actual_rate = self.device_default_config.clone().unwrap().sample_rate();
-        println!("Actual rate: {:?}", actual_rate.0);
+        let final_sample_rate = match self.user_recording_settings.sample_rate {
+            Some(rate) => rate,
+            None => {
+                self.device_default_config
+                    .as_ref()
+                    .map(|c| c.sample_rate().0)
+                    .unwrap_or(48000)
+            }
+        };
+        //let actual_rate = self.device_default_config.clone().unwrap().sample_rate();
+        //println!("Actual rate: {:?}", actual_rate.0);
         let final_channels = if let Some(ch) = self.user_recording_settings.channels {
             ch
         } else if let Some(ref dev_cfg) = self.device_default_config {
@@ -480,7 +508,7 @@ impl AudioEngine {
              "wav" => {
                 let spec = hound::WavSpec {
                     channels: final_channels,
-                    sample_rate: actual_rate.0 * 2,
+                    sample_rate: final_sample_rate,
                     bits_per_sample: final_bit_depth,
                     sample_format: hound::SampleFormat::Int,
                 };
@@ -540,6 +568,7 @@ pub struct GranularSynth {
     should_stop: Arc<AtomicBool>,
     pub grain_sender: Arc<Sender<Vec<f32>>>,
     pub grain_receiver: Arc<Receiver<Vec<f32>>>,
+    thread_handle: Option<JoinHandle<()>>,
 }
 impl GranularSynth {
     // Maybe add a function to set the numbrt of grain_voices
@@ -573,6 +602,7 @@ impl GranularSynth {
             should_stop: Arc::new(AtomicBool::new(false)),
             grain_sender: Arc::new(s),
             grain_receiver: Arc::new(r), 
+            thread_handle: None,
         }
     }
 
@@ -582,14 +612,13 @@ impl GranularSynth {
         interval_ms
     }
 
-    pub fn start_scheduler(&self) {
+    pub fn start_scheduler(&mut self) {
         let synth_clone = self.clone_for_thread(); 
         self.should_stop.store(false, Ordering::SeqCst);
-        thread::spawn(move || {
+        let handle = thread::spawn(move || {
             let metro_time = synth_clone.calculate_metro_time_in_ms();
             let interval = Duration::from_millis(metro_time as u64);
             let mut next_time = Instant::now();
-            println!("synth_clone.should_stop: {:?}", synth_clone.should_stop);
             // mientras sea falso
             while !synth_clone.should_stop.load(Ordering::SeqCst) {
                 let now = Instant::now();
@@ -606,12 +635,15 @@ impl GranularSynth {
                 }
             }
         });
+        self.thread_handle = Some(handle);
     }
 
     /// We could also drop the Arc if we wanted.
-    pub fn stop_scheduler(&self) {
+    pub fn stop_scheduler(&mut self) {
         self.should_stop.store(true, Ordering::SeqCst);
-        // join or handle the thread
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
     }
 
     // One detail: to move `GranularSynth` into a thread’s closure, 
@@ -627,6 +659,7 @@ impl GranularSynth {
             should_stop: Arc::clone(&self.should_stop),
             grain_receiver: Arc::clone(&self.grain_receiver),
             grain_sender: Arc::clone(&self.grain_sender),
+            thread_handle: None,
         }
     }
 
@@ -1026,7 +1059,7 @@ pub extern "C" fn stop_scheduler(
 ) {
     let synth = unsafe {
         assert!(!synth_ptr.is_null());
-        &*synth_ptr
+        &mut *synth_ptr
     };
     synth.stop_scheduler();
 }

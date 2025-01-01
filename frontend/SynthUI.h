@@ -52,12 +52,12 @@ extern "C" {
     void set_bit_rate(AudioEngine* ptr, unsigned int bitrate);
     void set_flac_compression(AudioEngine* ptr, unsigned char level);
 
-    DeviceList get_output_devices(AudioEngine* ptr);
-    void free_device_list(DeviceList list);
+    //DeviceList get_output_devices(AudioEngine* ptr);
+    //void free_device_list(DeviceList list);
 
-    int set_output_device(AudioEngine* ptr, size_t index);
-    int set_default_output_device(AudioEngine* ptr);
-    char* get_default_output_device(AudioEngine* ptr);
+    //int set_output_device(AudioEngine* ptr, size_t index);
+    //int set_default_output_device(AudioEngine* ptr);
+    //char* get_default_output_device(AudioEngine* ptr);
 
     int record(AudioEngine* ptr, const char* output_path);
     int stop_recording(AudioEngine* ptr);

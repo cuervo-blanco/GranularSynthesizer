@@ -9,9 +9,12 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include "SynthUI.h"
 
 extern "C" {
     typedef struct AudioEngine AudioEngine;
+    typedef struct GranularSynth GranularSynth;
+
     typedef struct DeviceList {
         const void* devices;
         size_t count;
@@ -24,7 +27,7 @@ extern "C" {
 
     DeviceList get_output_devices(AudioEngine* ptr);
     void free_device_list(DeviceList list);
-    int set_output_devices(AudioEngine* ptr, size_t index);
+    int set_output_device(AudioEngine* ptr, size_t index);
 
     int set_default_output_device(AudioEngine* ptr);
 
@@ -39,7 +42,7 @@ class AudioSettingsDialog : public QDialog {
     Q_OBJECT
 
 public:
-    explicit AudioSettingsDialog(QWidget *parent = nullptr, AudioEngine *engine = nullptr);
+    explicit AudioSettingsDialog(QWidget *parent = nullptr, AudioEngine *engine = nullptr, GranularSynth *synth = nullptr);
     ~AudioSettingsDialog();
 
 private slots:
@@ -48,6 +51,7 @@ private slots:
 
 private:
     AudioEngine *enginePtr;
+    GranularSynth *synthPtr;
 
     QComboBox *outputDeviceComboBox;
     QSpinBox *sampleRateSpinBox;

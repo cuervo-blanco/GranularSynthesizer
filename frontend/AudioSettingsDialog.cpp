@@ -6,8 +6,8 @@
 #include <QLabel>
 #include <QDebug>
 
-AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine)
-    : QDialog(parent), enginePtr(engine) {
+AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, GranularSynth *synth)
+    : QDialog(parent), enginePtr(engine), synthPtr(synth) {
 
     setWindowTitle("Audio Settings");
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -19,25 +19,20 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine)
     outputDeviceComboBox = new QComboBox(this);
     mainLayout->addWidget(outputDeviceComboBox);
 
-
-
     DeviceList deviceList{};
     deviceList.devices = nullptr;
     deviceList.count   = 0;
 
     if (enginePtr) {
-        DeviceList deviceList = get_output_devices(enginePtr);
-        qDebug() << "deviceList.count =" << deviceList.count;
+        DeviceList list = get_output_devices(enginePtr);
+        //qDebug() << "deviceList.count =" << deviceList.count;
         const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
-        for (size_t i = 0; i < deviceList.count; i++) {
-            printf("%s", arr[i].name);
-        }
         if (deviceList.devices && deviceList.count > 0) {
-            const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
             for (size_t i = 0; i < deviceList.count; i++) {
-                QString devName = QString::fromUtf8(arr[i].name);
-                outputDeviceComboBox->addItem(
-                        devName, (qulonglong)arr[i].index);
+                auto di = reinterpret_cast<const DeviceInfo*>(list.devices)[i];
+                // Make a permanent copy of the C-string:
+                QString devName = QString::fromUtf8(di.name);
+                outputDeviceComboBox->addItem(devName, (qulonglong)di.index);
             }
         }
     }
@@ -109,6 +104,9 @@ void AudioSettingsDialog::applySettings() {
         reject();
         return;
     }
+
+    stop_scheduler(synthPtr);
+    audio_engine_stop(enginePtr);
     
     set_sample_rate(enginePtr, sampleRateSpinBox->value());
     set_bit_depth(enginePtr, static_cast<unsigned short>(bitDepthSpinBox->value()));
@@ -128,6 +126,9 @@ void AudioSettingsDialog::applySettings() {
         size_t devIndex = val.value<qulonglong>();
         set_output_device(enginePtr, devIndex);
     }
+
+    audio_engine_start(enginePtr);
+    start_scheduler(synthPtr);
 
     accept();
 }

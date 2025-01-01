@@ -147,6 +147,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
 
     synthPtr = create_synth();
     enginePtr = create_audio_engine(synthPtr);
+    //audio_engine_start(enginePtr);
     set_default_output_device(enginePtr);
 
     updateEnvelopeDisplay();
@@ -172,7 +173,7 @@ SynthUI::~SynthUI() {
 }
 
 void SynthUI::onAudioSettingsClicked() {
-    AudioSettingsDialog dialog(this, enginePtr);
+    AudioSettingsDialog dialog(this, enginePtr, synthPtr);
     if (dialog.exec() == QDialog::Accepted) {
         int ret = audio_engine_start(enginePtr);
         if (ret != 0) {
