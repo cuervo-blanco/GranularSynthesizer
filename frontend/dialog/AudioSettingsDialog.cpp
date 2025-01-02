@@ -20,13 +20,43 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     return;
 }
 
+    // ================================================================
+    //
+    // DEVICE SETTINGS
+    //
+    // ================================================================
+    // Hiding this for now, as output device setting seems to be a problem
+    // for the time being at least
+    //
     // Output Device
-    QLabel *outputDeviceLabel = new QLabel("Output Device:", this);
-    mainLayout->addWidget(outputDeviceLabel);
+    //
+    //QLabel *outputDeviceLabel = new QLabel("Output Device:", this);
+    //mainLayout->addWidget(outputDeviceLabel);
 
-    outputDeviceComboBox = new QComboBox(this);
-    mainLayout->addWidget(outputDeviceComboBox);
+    //outputDeviceComboBox = new QComboBox(this);
+    //mainLayout->addWidget(outputDeviceComboBox);
 
+    //DeviceList list{};
+    //list.devices = nullptr;
+    //list.count   = 0;
+
+    //if (enginePtr) {
+        //DeviceList list = get_output_devices(enginePtr);
+        //if (list.devices && list.count > 0) {
+            //for (size_t i = 0; i < list.count; i++) {
+                //auto di = reinterpret_cast<const DeviceInfo*>(list.devices)[i];
+                //QString devName = QString::fromUtf8(di.name);
+                //outputDeviceComboBox->addItem(devName, (qulonglong)di.index);
+            //}
+            //free_device_list(list);
+        //} else {
+            //qDebug() << "No devices found!";
+        //}
+    //}
+    //connect(outputDeviceComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            //this, &AudioSettingsDialog::onOutputDeviceChanged);
+
+    // Get default settings function
     UserSettings settings = get_user_settings(enginePtr);
     QString formatStr;
     if (settings.format) {
@@ -35,28 +65,6 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
         qDebug() << "Format string is null!";
         formatStr = "wav"; // Default format
     }
-
-    DeviceList list{};
-    list.devices = nullptr;
-    list.count   = 0;
-
-    if (enginePtr) {
-        DeviceList list = get_output_devices(enginePtr);
-        if (list.devices && list.count > 0) {
-            for (size_t i = 0; i < list.count; i++) {
-                auto di = reinterpret_cast<const DeviceInfo*>(list.devices)[i];
-                QString devName = QString::fromUtf8(di.name);
-                outputDeviceComboBox->addItem(devName, (qulonglong)di.index);
-            }
-            free_device_list(list);
-        } else {
-            qDebug() << "No devices found!";
-        }
-    }
-    connect(outputDeviceComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &AudioSettingsDialog::onOutputDeviceChanged);
-
-    // Get default settings function
 
     // Sample Rate
     QLabel *sampleRateLabel = new QLabel("Sample Rate (Hz):", this);
@@ -125,12 +133,12 @@ void AudioSettingsDialog::applySettings() {
     unsigned int newSampleRate = sampleRateSpinBox->value();
     unsigned short newBitDepth = static_cast<unsigned short>(bitDepthSpinBox->value());
     QString format = fileFormatComboBox->currentText();
-    int selectedDeviceIndex = outputDeviceComboBox->currentData().toInt();
-    size_t devIndex = 0; // or default
-    if (selectedDeviceIndex >= 0) {
-        QVariant val = outputDeviceComboBox->itemData(selectedDeviceIndex);
-        devIndex = val.value<qulonglong>();
-    }
+    //int selectedDeviceIndex = outputDeviceComboBox->currentData().toInt();
+    size_t devIndex = 0;
+    //if (selectedDeviceIndex >= 0) {
+        //QVariant val = outputDeviceComboBox->itemData(selectedDeviceIndex);
+        //devIndex = val.value<qulonglong>();
+    //}
 
     QMessageBox::StandardButton reply = QMessageBox::warning(
         this,
@@ -142,7 +150,7 @@ void AudioSettingsDialog::applySettings() {
         return;
     }
     if (reply == QMessageBox::Yes) {
-        SettingsManager::saveSettings(newSampleRate, newBitDepth, selectedDeviceIndex, format);
+        SettingsManager::saveSettings(newSampleRate, newBitDepth, devIndex, format);
         QProcess::startDetached(QApplication::applicationFilePath(), QStringList());
         QApplication::quit();
     }

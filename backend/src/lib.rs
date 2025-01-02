@@ -330,6 +330,7 @@ impl AudioEngine {
     // PLAYBACK
     // ----------------------
     pub fn start(&mut self) -> i32 {
+        let _ = self.set_default_output_device();
         let output_device = match self.output_device.as_ref() {
             Some(device) => {
                 println!("Using output device: {}", 

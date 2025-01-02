@@ -204,6 +204,7 @@ void SynthUI::initializeAudioEngine(const QJsonObject &settings) {
             bitDepth, 
             format.toUtf8().constData(), 
             deviceIndex);
+    set_output_device(enginePtr, deviceIndex);
 }
 
 void SynthUI::onAudioSettingsClicked() {

@@ -56,7 +56,7 @@ extern "C" {
     //DeviceList get_output_devices(AudioEngine* ptr);
     //void free_device_list(DeviceList list);
 
-    //int set_output_device(AudioEngine* ptr, size_t index);
+    int set_output_device(AudioEngine* ptr, size_t index);
     //int set_default_output_device(AudioEngine* ptr);
     //char* get_default_output_device(AudioEngine* ptr);
 
