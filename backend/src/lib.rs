@@ -209,14 +209,8 @@ impl AudioEngine {
     pub fn new(
         synth: Arc<GranularSynth>,
         user_settings: UserRecordingSettings,
+        output_device: Option<cpal::Device>,
         ) -> Self {
-        let host = cpal::default_host();
-        let output_device = match host.default_output_device() {
-            Some(device) => Some(device),
-            None => {
-                eprintln!("No default output device found!"); None
-            }
-        };
 
         let device_default_config = output_device.as_ref().and_then(|dev| {
             dev.default_output_config().ok()
@@ -336,6 +330,18 @@ impl AudioEngine {
     // PLAYBACK
     // ----------------------
     pub fn start(&mut self) -> i32 {
+        let output_device = match self.output_device.as_ref() {
+            Some(device) => {
+                println!("Using output device: {}", 
+                    device.name().unwrap_or_else(|_| "Unknown".to_string())
+                );
+                device
+            }
+            None => {
+                eprintln!("No output device set. Cannot start stream.");
+                return -1;
+            }
+        };
         // if Stream already exists, drop it and re-build
         if let Some(existing) = self.stream.take() {
             drop(existing);
@@ -350,6 +356,7 @@ impl AudioEngine {
 
         let user_rate = self.get_master_sample_rate();
         let bit_depth = self.user_recording_settings.bit_depth.unwrap_or(16);
+        println!("Bit depth to use: {}", bit_depth);
 
         let config = cpal::StreamConfig {
             channels: num_channels as u16,
@@ -369,7 +376,7 @@ impl AudioEngine {
         let is_recording_for_callback = self.is_recording.clone();
         let is_recording_clone = Arc::clone(&is_recording_for_callback);
 
-        let stream = match self.output_device.as_ref().unwrap().build_output_stream(
+        let stream = match output_device.build_output_stream(
             &config.clone().into(),
             move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                 // 1. gather any newly scheduled grains
@@ -388,8 +395,6 @@ impl AudioEngine {
                     for sample in frame.iter_mut() {
                         *sample = mix_sample;
                     }
-                    //frame[0] = mix_sample;
-                    //frame[1] = mix_sample;
                 }
                 grains.retain(|g| !g.is_finished());
 
@@ -490,6 +495,7 @@ impl AudioEngine {
                     .unwrap_or(48000)
             }
         };
+        println!("Final sample rate: {}", final_sample_rate);
 
         let final_channels = if let Some(ch) = self.user_recording_settings.channels {
             ch
@@ -500,11 +506,13 @@ impl AudioEngine {
         };
 
         let final_bit_depth = self.user_recording_settings.bit_depth.unwrap_or(16);
+        println!("Final bit_depth: {}", final_bit_depth);
 
         let final_format = self.user_recording_settings
             .format
             .as_deref()
             .unwrap_or("wav");
+        println!("Final format: {}", final_format);
 
         match final_format {
              "wav" => {
@@ -548,6 +556,7 @@ impl AudioEngine {
             //let writer = std::mem::replace(&mut writer_arc, &mut Writers::WavWriter(dummy_placeholder()));
             match writer {
                 Writers::WavWriter(wav_writer) => {
+                    println!("Finalizing WAV writer");
                     wav_writer.finalize().map_err(|e| e.to_string())?;
                 }
             }
@@ -1141,9 +1150,8 @@ pub extern "C" fn create_audio_engine(
     channels: u16,
     bit_depth: u16,
     format: *const c_char,
+    device_index: usize,
 ) -> *mut AudioEngine {
-    // Perhaps change the function signature to provide settings when creating 
-    // the Audio Engine
     unsafe {
         assert!(!synth_ptr.is_null());
         let synth_ref = &*synth_ptr;
@@ -1156,6 +1164,18 @@ pub extern "C" fn create_audio_engine(
                 format_str = s.to_string();
             }
         }
+
+        let host = cpal::default_host();
+        let devices = match host.output_devices() {
+            Ok(devices) => devices.collect::<Vec<_>>(),
+            Err(_) => Vec::new(),
+        };
+
+        let output_device = devices.get(device_index).cloned();
+        if output_device.is_none() {
+            eprintln!("Invalid device index: {}", device_index);
+            return std::ptr::null_mut();
+        }
         
         let user_settings = UserRecordingSettings {
             sample_rate: Some(sample_rate),
@@ -1164,7 +1184,7 @@ pub extern "C" fn create_audio_engine(
             format: Some(format_str),
             format_specific: None,  // or fill in...
         };
-        let engine = AudioEngine::new(arc_synth, user_settings);
+        let engine = AudioEngine::new(arc_synth, user_settings, output_device);
         Box::into_raw(Box::new(engine))
     }
 }
@@ -1231,6 +1251,53 @@ pub extern "C" fn destroy_audio_engine(engine_ptr: *mut AudioEngine) {
         let _ = Box::from_raw(engine_ptr);
     }
 }
+
+#[no_mangle]
+pub extern "C" fn get_output_device_list() -> *mut c_char {
+    let host = cpal::default_host();
+    let devices = match host.output_devices() {
+        Ok(devices) => devices.collect::<Vec<_>>(),
+        Err(_) => Vec::new(),
+    };
+
+    let device_names: Vec<String> = devices.iter()
+        .enumerate()
+        .map(|(i, device)| {
+            let name = device.name().unwrap_or_else(|_| "Unknown device".to_string());
+            format!("{}: {}", i, name)
+        })
+        .collect();
+
+    let list_str = device_names.join("\n");
+    let c_str = std::ffi::CString::new(list_str).unwrap();
+    c_str.into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn get_default_output_device_index() -> i32 {
+    let host = cpal::default_host();
+
+    let devices: Vec<cpal::Device> = match host.output_devices() {
+        Ok(devices) => devices.collect(),
+        Err(_) => return -1, // Return -1 to indicate an error
+    };
+
+    // Get the default output device
+    let default_device = host.default_output_device();
+    if default_device.is_none() {
+        return -1;
+    }
+    let default_device = default_device.unwrap();
+
+    for (index, device) in devices.iter().enumerate() {
+        if device.name().unwrap_or_default() == default_device.name().unwrap_or_default() {
+            return index as i32;
+        }
+    }
+    -1
+}
+
+
 #[no_mangle]
 pub extern "C" fn get_master_sample_rate(engine_ptr: *mut AudioEngine) -> c_uint {
     if engine_ptr.is_null() {

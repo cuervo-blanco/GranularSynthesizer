@@ -3,10 +3,10 @@ name = "backend"
 version = "0.1.1"
 edition = "2021"
 authors = ["Cuervo Blanco"]
-descripton = "DSP backend for a Granular Synth"
+description = "DSP backend for a Granular Synth"
 license = "MIT" 
 repository = "n/a" 
-documentaion = "n/a" 
+documentation = "n/a" 
 
 [lib]
 crate-type = ["cdylib", "staticlib"]

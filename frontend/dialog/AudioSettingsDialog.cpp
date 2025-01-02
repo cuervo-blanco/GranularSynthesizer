@@ -1,10 +1,13 @@
 #include "AudioSettingsDialog.h"
 #include "SynthUI.h"
+#include "SettingsManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QLabel>
 #include <QDebug>
+#include <QProcess>
+#include <QApplication>
 
 AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, GranularSynth *synth, QString *path)
     : QDialog(parent), enginePtr(engine), synthPtr(synth), loadedFilePath(path) {
@@ -118,27 +121,32 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
 AudioSettingsDialog::~AudioSettingsDialog() {}
 
 void AudioSettingsDialog::applySettings() {
-if (!enginePtr || !synthPtr) {
-        reject();
-        return;
-    }
 
-    unsigned int newRate = sampleRateSpinBox->value();
+    unsigned int newSampleRate = sampleRateSpinBox->value();
     unsigned short newBitDepth = static_cast<unsigned short>(bitDepthSpinBox->value());
-    QString fmt = fileFormatComboBox->currentText();
-
-    int currentIndex = outputDeviceComboBox->currentIndex();
+    QString format = fileFormatComboBox->currentText();
+    int selectedDeviceIndex = outputDeviceComboBox->currentData().toInt();
     size_t devIndex = 0; // or default
-    if (currentIndex >= 0) {
-        QVariant val = outputDeviceComboBox->itemData(currentIndex);
+    if (selectedDeviceIndex >= 0) {
+        QVariant val = outputDeviceComboBox->itemData(selectedDeviceIndex);
         devIndex = val.value<qulonglong>();
     }
 
-    if (SynthUI* mainUi = qobject_cast<SynthUI*>(parentWidget())) {
-        mainUi->reinitializeAudio(newRate, newBitDepth, fmt, devIndex);
+    QMessageBox::StandardButton reply = QMessageBox::warning(
+        this,
+        "Apply Settings",
+        "Applying these settings will restart the application. Any unsaved changes will be lost.\n\nDo you wish to proceed?",
+        QMessageBox::Yes | QMessageBox::No
+    );
+    if (reply == QMessageBox::No) {
+        return;
+    }
+    if (reply == QMessageBox::Yes) {
+        SettingsManager::saveSettings(newSampleRate, newBitDepth, selectedDeviceIndex, format);
+        QProcess::startDetached(QApplication::applicationFilePath(), QStringList());
+        QApplication::quit();
     }
 
-    accept();
 }
 
 void AudioSettingsDialog::onOutputDeviceChanged(int index) {

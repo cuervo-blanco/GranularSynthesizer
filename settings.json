@@ -1,0 +1,7 @@
+{
+    "sample_rate": 48000,
+    "bit_depth": 32,
+    "output_device_index": 0,
+    "file_format": "wav"
+}
+

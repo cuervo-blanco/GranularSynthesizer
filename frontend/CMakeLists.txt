@@ -19,8 +19,17 @@ if(NOT RUST_LIB)
     message(FATAL_ERROR "Rust library not found!")
 endif()
 
-add_executable(QtRustSynth main.cpp SynthUI.h SynthUI.cpp AudioSettingsDialog.h AudioSettingsDialog.cpp )
+add_executable(QtRustSynth 
+    main.cpp 
+    SynthUI.h SynthUI.cpp 
+    dialog/AudioSettingsDialog.h dialog/AudioSettingsDialog.cpp 
+    settings/SettingsManager.h settings/SettingsManager.cpp
+)
 target_link_libraries(QtRustSynth PRIVATE ${RUST_LIB})
 
-target_include_directories(QtRustSynth PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(QtRustSynth PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/settings
+    ${CMAKE_CURRENT_SOURCE_DIR}/dialog
+)
 target_link_libraries(QtRustSynth PRIVATE Qt6::Widgets)

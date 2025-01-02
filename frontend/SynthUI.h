@@ -41,7 +41,7 @@ extern "C" {
     void generate_grain_envelope(GranularSynth* ptr, size_t size);
 
     AudioEngine* create_audio_engine(GranularSynth* ptr, unsigned int sample_rate, unsigned short channels,
-            unsigned short bit_depth, const char* format);
+            unsigned short bit_depth, const char* format, int index);
     int audio_engine_start(AudioEngine* ptr);
     void audio_engine_stop(AudioEngine* ptr);
     void destroy_audio_engine(AudioEngine* ptr);
@@ -85,6 +85,7 @@ extern "C" {
 
     int get_sample_rate(GranularSynth* ptr);
     int get_total_channels(GranularSynth* ptr);
+    int get_default_output_device_index();
 
 #ifdef __cplusplus
 } // extern "C"
@@ -100,11 +101,8 @@ class SynthUI : public QWidget {
 public:
     explicit SynthUI(QWidget *parent = nullptr);
     ~SynthUI();
+    void initializeAudioEngine(const QJsonObject &settings);
 
-    void reinitializeAudio( unsigned int sampleRate, 
-                            unsigned short bitDepth, 
-                            const QString &format,
-                            size_t deviceIndex);
 private slots:
     void onLoadFileClicked();
     void onGrainStartReleased();
@@ -164,6 +162,7 @@ private:
 
     QString loadedFilePath;
     unsigned int globalSampleRate;
+    int globalDeviceIndex;
     
 
     void updateWaveformDisplay();

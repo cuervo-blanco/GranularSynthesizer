@@ -1,5 +1,6 @@
 #include "SynthUI.h"
 #include "AudioSettingsDialog.h" 
+#include "SettingsManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileDialog>
@@ -14,8 +15,16 @@
 // Constructor
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
+    QJsonObject settings = SettingsManager::loadSettings();
+
+    unsigned int globalSampleRate = settings["sample_rate"].toInt(48000);
+    unsigned short bitDepth = settings["bit_depth"].toInt(16);
+    QString format = settings["file_format"].toString("wav");
+    size_t deviceIndex = settings["output_device_index"].toInt(0);
+
+    initializeAudioEngine(settings);
+
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    unsigned int globalSampleRate = 48000;
 
     // Buttons
     loadFileButton = new QPushButton("Load WAV", this);
@@ -146,11 +155,10 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
     grainEnvelopeView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(grainEnvelopeView, 1);
 
-    synthPtr = create_synth(globalSampleRate);
-    enginePtr = create_audio_engine(synthPtr, globalSampleRate, 2, 32, "wav");
-    //audio_engine_start(enginePtr);
-    set_default_output_device(enginePtr);
+    // Get default device index
+    //int globalDeviceIndex = get_default_output_device_index();
 
+    generate_grain_envelope(synthPtr, 2048);
     updateEnvelopeDisplay();
     setLayout(mainLayout);
     setWindowTitle("Granular Synthesizer");
@@ -171,6 +179,31 @@ SynthUI::~SynthUI() {
         destroy_synth(synthPtr);
         synthPtr = nullptr;
     }
+}
+
+void SynthUI::initializeAudioEngine(const QJsonObject &settings) {
+    unsigned int sampleRate = settings["sample_rate"].toInt(48000);
+    unsigned short bitDepth = settings["bit_depth"].toInt(16);
+    QString format = settings["file_format"].toString("wav");
+    size_t deviceIndex = settings["output_device_index"].toInt(0);
+
+    if (enginePtr) {
+        audio_engine_stop(enginePtr);
+        destroy_audio_engine(enginePtr);
+    }
+
+    if (synthPtr) {
+        destroy_synth(synthPtr);
+    }
+
+    synthPtr = create_synth(sampleRate);
+    enginePtr = create_audio_engine(
+            synthPtr, 
+            sampleRate, 
+            2, 
+            bitDepth, 
+            format.toUtf8().constData(), 
+            deviceIndex);
 }
 
 void SynthUI::onAudioSettingsClicked() {
@@ -567,41 +600,4 @@ void SynthUI::resizeEvent(QResizeEvent* event){
     updateGrainSelectionRect();  // reposition rectangle
 }
 
-void SynthUI::reinitializeAudio(unsigned int sampleRate, unsigned short bitDepth, 
-                                const QString &format, size_t deviceIndex) {
-    globalSampleRate = sampleRate;
-    stop_scheduler(synthPtr);
-    if (enginePtr) {
-        audio_engine_stop(enginePtr);
-        destroy_audio_engine(enginePtr);
-        enginePtr = nullptr;
-    }
-
-    if (synthPtr) {
-        destroy_synth(synthPtr);
-        synthPtr = nullptr;
-    }
-
-    synthPtr = create_synth(globalSampleRate);
-    enginePtr = create_audio_engine(
-            synthPtr, 
-            globalSampleRate, 
-            2, 
-            bitDepth, 
-            format.toUtf8().constData()
-    );
-
-    //set_output_device(enginePtr, deviceIndex);
-    // It seems that setting the output device ruins everything!
-    // Must find a fix
-
-    if (!loadedFilePath.isEmpty()) {
-        load_audio_from_file(synthPtr, 
-                             loadedFilePath.toStdString().c_str(), 
-                             sampleRate);
-    }
-
-    //audio_engine_start(enginePtr);
-    //start_scheduler(synthPtr);
-}
 
