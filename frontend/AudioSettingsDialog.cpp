@@ -12,6 +12,11 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     setWindowTitle("Audio Settings");
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
+    if (!enginePtr) {
+    qDebug() << "Engine pointer is null!";
+    return;
+}
+
     // Output Device
     QLabel *outputDeviceLabel = new QLabel("Output Device:", this);
     mainLayout->addWidget(outputDeviceLabel);
@@ -19,35 +24,43 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     outputDeviceComboBox = new QComboBox(this);
     mainLayout->addWidget(outputDeviceComboBox);
 
+    UserSettings settings = get_user_settings(enginePtr);
+    QString formatStr;
+    if (settings.format) {
+        formatStr = QString::fromUtf8(settings.format);
+    } else {
+        qDebug() << "Format string is null!";
+        formatStr = "wav"; // Default format
+    }
+
     DeviceList list{};
     list.devices = nullptr;
     list.count   = 0;
 
     if (enginePtr) {
         DeviceList list = get_output_devices(enginePtr);
-        //qDebug() << "deviceList.count =" << deviceList.count;
-        //const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
         if (list.devices && list.count > 0) {
             for (size_t i = 0; i < list.count; i++) {
                 auto di = reinterpret_cast<const DeviceInfo*>(list.devices)[i];
                 QString devName = QString::fromUtf8(di.name);
                 outputDeviceComboBox->addItem(devName, (qulonglong)di.index);
             }
+            free_device_list(list);
+        } else {
+            qDebug() << "No devices found!";
         }
     }
     connect(outputDeviceComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &AudioSettingsDialog::onOutputDeviceChanged);
 
-    if (list.devices) {
-        free_device_list(list);
-    }
+    // Get default settings function
 
     // Sample Rate
     QLabel *sampleRateLabel = new QLabel("Sample Rate (Hz):", this);
     mainLayout->addWidget(sampleRateLabel);
     sampleRateSpinBox = new QSpinBox(this);
     sampleRateSpinBox->setRange(22050, 192000);
-    sampleRateSpinBox->setValue(44100);
+    sampleRateSpinBox->setValue(settings.sample_rate);
     mainLayout->addWidget(sampleRateSpinBox);
 
     // Bit Depth
@@ -55,7 +68,7 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     mainLayout->addWidget(bitDepthLabel);
     bitDepthSpinBox = new QSpinBox(this);
     bitDepthSpinBox->setRange(8, 32);
-    bitDepthSpinBox->setValue(16);
+    bitDepthSpinBox->setValue(settings.bit_depth);
     mainLayout->addWidget(bitDepthSpinBox);
 
     // File Format
@@ -63,6 +76,12 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     mainLayout->addWidget(fileFormatLabel);
     fileFormatComboBox = new QComboBox(this);
     fileFormatComboBox->addItems({"wav", "mp3", "flac"});
+    int index = fileFormatComboBox->findText(formatStr);
+    if (index != -1) {
+        fileFormatComboBox->setCurrentIndex(index);
+    } else {
+        qDebug() << "Unknown format: " << formatStr;
+    }
     mainLayout->addWidget(fileFormatComboBox);
 
     // Bit Rate (For MP3)

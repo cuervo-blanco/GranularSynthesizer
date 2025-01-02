@@ -214,8 +214,7 @@ impl AudioEngine {
         let output_device = match host.default_output_device() {
             Some(device) => Some(device),
             None => {
-                eprintln!("No default output device found!");
-                None
+                eprintln!("No default output device found!"); None
             }
         };
 
@@ -403,6 +402,7 @@ impl AudioEngine {
                         match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
                                 match bit_depth {
+                                    // Needs to implement different formats better.
                                     16 => {
                                         for &sample in data.iter() {
                                             let sample_i16 = (sample * std::i16::MAX as f32) as i16;
@@ -1166,6 +1166,41 @@ pub extern "C" fn create_audio_engine(
         };
         let engine = AudioEngine::new(arc_synth, user_settings);
         Box::into_raw(Box::new(engine))
+    }
+}
+
+#[repr(C)]
+pub struct UserSettings {
+    sample_rate: u32,
+    bit_depth: u16,
+    format: *const c_char,
+}
+
+#[no_mangle]
+pub extern "C" fn get_user_settings(engine_ptr: *mut AudioEngine) -> UserSettings {
+
+    let engine = unsafe {
+        assert!(!engine_ptr.is_null());
+        &mut *engine_ptr
+    };
+
+    let user_settings = &engine.user_recording_settings;
+
+    let sample_rate = user_settings.sample_rate.unwrap_or(48000); // Default: 48kHz
+    let bit_depth = user_settings.bit_depth.unwrap_or(32);        // Default: 32-bit
+    let format = user_settings
+        .format
+        .clone()
+        .unwrap_or_else(|| "wav".to_string()); // Default: WAV
+
+    // Convert the format string to a C-compatible string
+    let format_c_string = std::ffi::CString::new(format).unwrap();
+    let format_ptr = format_c_string.into_raw(); // Ownership transferred to the caller
+
+    UserSettings {
+        sample_rate,
+        bit_depth,
+        format: format_ptr,
     }
 }
 

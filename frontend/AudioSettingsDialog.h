@@ -25,7 +25,14 @@ extern "C" {
         const char* name;
     } DeviceInfo;
 
+    typedef struct UserSettings {
+        unsigned int sample_rate;
+        unsigned short bit_depth;
+        const char* format;
+    } UserSettings;
+
     DeviceList get_output_devices(AudioEngine* ptr);
+    UserSettings get_user_settings(AudioEngine* ptr);
     void free_device_list(DeviceList list);
     int set_output_device(AudioEngine* ptr, size_t index);
 
@@ -67,6 +74,7 @@ private:
 
     QLabel *flacCompressionLabel;
     QLabel *bitRateLabel;
+    QString formatStr;
     // Maybe there should be more labels
 };
 
