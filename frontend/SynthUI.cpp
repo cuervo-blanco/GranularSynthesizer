@@ -12,9 +12,10 @@
 #include <cmath>
 
 // Constructor
-SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
+SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    unsigned int globalSampleRate = 48000;
 
     // Buttons
     loadFileButton = new QPushButton("Load WAV", this);
@@ -145,8 +146,8 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent) {
     grainEnvelopeView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     mainLayout->addWidget(grainEnvelopeView, 1);
 
-    synthPtr = create_synth();
-    enginePtr = create_audio_engine(synthPtr);
+    synthPtr = create_synth(globalSampleRate);
+    enginePtr = create_audio_engine(synthPtr, globalSampleRate, 2, 32, "wav");
     //audio_engine_start(enginePtr);
     set_default_output_device(enginePtr);
 
@@ -173,7 +174,7 @@ SynthUI::~SynthUI() {
 }
 
 void SynthUI::onAudioSettingsClicked() {
-    AudioSettingsDialog dialog(this, enginePtr, synthPtr);
+    AudioSettingsDialog dialog(this, enginePtr, synthPtr, &loadedFilePath);
     if (dialog.exec() == QDialog::Accepted) {
         int ret = audio_engine_start(enginePtr);
         if (ret != 0) {
@@ -246,6 +247,7 @@ void SynthUI::onLoadFileClicked() {
         return;
     }
 
+    start_scheduler(synthPtr);
     if (!synthPtr) {
         QMessageBox::warning(this, "Error", "No synth created!");
         return;
@@ -372,7 +374,7 @@ void SynthUI::onOverlapValueChanged() {
 
 void SynthUI::onPlayAudioClicked() {
     if (!synthPtr) {
-        synthPtr = create_synth();
+        synthPtr = create_synth(globalSampleRate);
     }
     if (!enginePtr) {
         QMessageBox::critical(this, "Audio Error", "Failed to create audio engine!");
@@ -564,3 +566,42 @@ void SynthUI::resizeEvent(QResizeEvent* event){
     drawFullWaveformOnce();      // re-draw waveform path at new size
     updateGrainSelectionRect();  // reposition rectangle
 }
+
+void SynthUI::reinitializeAudio(unsigned int sampleRate, unsigned short bitDepth, 
+                                const QString &format, size_t deviceIndex) {
+    globalSampleRate = sampleRate;
+    stop_scheduler(synthPtr);
+    if (enginePtr) {
+        audio_engine_stop(enginePtr);
+        destroy_audio_engine(enginePtr);
+        enginePtr = nullptr;
+    }
+
+    if (synthPtr) {
+        destroy_synth(synthPtr);
+        synthPtr = nullptr;
+    }
+
+    synthPtr = create_synth(globalSampleRate);
+    enginePtr = create_audio_engine(
+            synthPtr, 
+            globalSampleRate, 
+            2, 
+            bitDepth, 
+            format.toUtf8().constData()
+    );
+
+    //set_output_device(enginePtr, deviceIndex);
+    // It seems that setting the output device ruins everything!
+    // Must find a fix
+
+    if (!loadedFilePath.isEmpty()) {
+        load_audio_from_file(synthPtr, 
+                             loadedFilePath.toStdString().c_str(), 
+                             sampleRate);
+    }
+
+    //audio_engine_start(enginePtr);
+    //start_scheduler(synthPtr);
+}
+

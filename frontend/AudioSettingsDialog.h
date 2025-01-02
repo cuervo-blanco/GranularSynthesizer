@@ -42,7 +42,11 @@ class AudioSettingsDialog : public QDialog {
     Q_OBJECT
 
 public:
-    explicit AudioSettingsDialog(QWidget *parent = nullptr, AudioEngine *engine = nullptr, GranularSynth *synth = nullptr);
+    explicit AudioSettingsDialog(
+            QWidget *parent = nullptr,
+            AudioEngine *engine = nullptr,
+            GranularSynth *synth = nullptr,
+            QString *path = nullptr);
     ~AudioSettingsDialog();
 
 private slots:
@@ -52,6 +56,7 @@ private slots:
 private:
     AudioEngine *enginePtr;
     GranularSynth *synthPtr;
+    QString *loadedFilePath;
 
     QComboBox *outputDeviceComboBox;
     QSpinBox *sampleRateSpinBox;

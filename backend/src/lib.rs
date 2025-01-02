@@ -355,8 +355,9 @@ impl AudioEngine {
         let config = cpal::StreamConfig {
             channels: num_channels as u16,
             sample_rate: cpal::SampleRate(user_rate),
-            buffer_size: cpal::BufferSize::Default, // or some user-chosen size
+            buffer_size: cpal::BufferSize::Fixed(2048),
         };
+        println!("Sample Rate for Stream: {}", user_rate);
 
         let active_grains = Arc::new(Mutex::new(Vec::<ActiveGrain>::new()));
         let grains_arc = Arc::clone(&active_grains);
@@ -462,7 +463,9 @@ impl AudioEngine {
     }
 
     pub fn stop(&mut self) {
-        self.stream.take();
+        if let Some(existing) = self.stream.take() {
+            drop(existing);
+        }
     }
 
     // ----------------------
@@ -487,8 +490,7 @@ impl AudioEngine {
                     .unwrap_or(48000)
             }
         };
-        //let actual_rate = self.device_default_config.clone().unwrap().sample_rate();
-        //println!("Actual rate: {:?}", actual_rate.0);
+
         let final_channels = if let Some(ch) = self.user_recording_settings.channels {
             ch
         } else if let Some(ref dev_cfg) = self.device_default_config {
@@ -572,9 +574,9 @@ pub struct GranularSynth {
 }
 impl GranularSynth {
     // Maybe add a function to set the numbrt of grain_voices
-    pub fn new() -> Self {
+    pub fn new(sample_rate: u32) -> Self {
         let specs = Specs {
-            sample_rate: 44100,
+            sample_rate: sample_rate,
             channels: 2,
             filesize: 0,
         };
@@ -735,15 +737,14 @@ impl GranularSynth {
                 let filesize = final_samples.len();
                 let mut params = self.params.lock().unwrap();
                 params.specs.filesize = filesize;
-                // Resample? 
                 params.specs.sample_rate = master_rate;
                 params.specs.channels = input_channels;
                 drop(params);
 
                 let mut buffer = self.source_array.lock().unwrap();
                 *buffer = final_samples;
-                0 // Success
-                  // Return file size and format validity
+
+                0
             }
             Err(_) => -1,
         }
@@ -989,8 +990,8 @@ use std::os::raw::{c_char, c_int, c_uint};
 use std::ptr;
 
 #[no_mangle]
-pub extern "C" fn create_synth() -> *mut GranularSynth {
-    let synth = Box::new(GranularSynth::new());
+pub extern "C" fn create_synth(sample_rate: u32) -> *mut GranularSynth {
+    let synth = Box::new(GranularSynth::new(sample_rate));
     Box::into_raw(synth)
 }
 
@@ -1132,9 +1133,14 @@ pub extern "C" fn set_overlap(
     params.grain_overlap = overlap.clamp(1.0, 2.0);
 }
 
+
 #[no_mangle]
 pub extern "C" fn create_audio_engine(
-    synth_ptr: *mut GranularSynth
+    synth_ptr: *mut GranularSynth,
+    sample_rate: u32,
+    channels: u16,
+    bit_depth: u16,
+    format: *const c_char,
 ) -> *mut AudioEngine {
     // Perhaps change the function signature to provide settings when creating 
     // the Audio Engine
@@ -1142,17 +1148,23 @@ pub extern "C" fn create_audio_engine(
         assert!(!synth_ptr.is_null());
         let synth_ref = &*synth_ptr;
         let arc_synth = Arc::new(synth_ref.clone_for_thread());
-        
-        // Provide a default ExportSettings
-        let default_export_settings = UserRecordingSettings {
-            channels: Some(2),
-            sample_rate: Some(44100),
-            bit_depth: Some(16),
-            format: Some("wav".to_string()),
-            format_specific: Some(FormatSpecificSettings::WavSettings {}),
-        };
 
-        let engine = AudioEngine::new(arc_synth, default_export_settings);
+        let mut format_str = "wav".to_string(); 
+        if !format.is_null() {
+            let cstr = std::ffi::CStr::from_ptr(format);
+            if let Ok(s) = cstr.to_str() {
+                format_str = s.to_string();
+            }
+        }
+        
+        let user_settings = UserRecordingSettings {
+            sample_rate: Some(sample_rate),
+            channels: Some(channels),
+            bit_depth: Some(bit_depth),
+            format: Some(format_str),
+            format_specific: None,  // or fill in...
+        };
+        let engine = AudioEngine::new(arc_synth, user_settings);
         Box::into_raw(Box::new(engine))
     }
 }

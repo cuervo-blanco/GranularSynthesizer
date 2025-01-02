@@ -34,13 +34,14 @@ extern "C" {
         size_t length;
     } GrainEnvelope;
 
-    GranularSynth* create_synth();
+    GranularSynth* create_synth(unsigned int sample_rate);
     void destroy_synth(GranularSynth* ptr);
 
     int load_audio_from_file(GranularSynth* ptr, const char* file_path, unsigned int master_sample_rate);
     void generate_grain_envelope(GranularSynth* ptr, size_t size);
 
-    AudioEngine* create_audio_engine(GranularSynth* ptr);
+    AudioEngine* create_audio_engine(GranularSynth* ptr, unsigned int sample_rate, unsigned short channels,
+            unsigned short bit_depth, const char* format);
     int audio_engine_start(AudioEngine* ptr);
     void audio_engine_stop(AudioEngine* ptr);
     void destroy_audio_engine(AudioEngine* ptr);
@@ -100,7 +101,10 @@ public:
     explicit SynthUI(QWidget *parent = nullptr);
     ~SynthUI();
 
-
+    void reinitializeAudio( unsigned int sampleRate, 
+                            unsigned short bitDepth, 
+                            const QString &format,
+                            size_t deviceIndex);
 private slots:
     void onLoadFileClicked();
     void onGrainStartReleased();
@@ -159,6 +163,8 @@ private:
     QLabel *overlapLabel;
 
     QString loadedFilePath;
+    unsigned int globalSampleRate;
+    
 
     void updateWaveformDisplay();
     void updateEnvelopeDisplay();
@@ -171,7 +177,6 @@ private:
     void drawFullWaveformOnce();
     void updateGrainSelectionRect();
     void resizeEvent(QResizeEvent* event) override;
-
     bool isPlaying = false;
 };
 

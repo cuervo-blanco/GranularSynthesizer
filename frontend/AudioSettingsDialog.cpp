@@ -6,8 +6,8 @@
 #include <QLabel>
 #include <QDebug>
 
-AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, GranularSynth *synth)
-    : QDialog(parent), enginePtr(engine), synthPtr(synth) {
+AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, GranularSynth *synth, QString *path)
+    : QDialog(parent), enginePtr(engine), synthPtr(synth), loadedFilePath(path) {
 
     setWindowTitle("Audio Settings");
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -19,18 +19,17 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     outputDeviceComboBox = new QComboBox(this);
     mainLayout->addWidget(outputDeviceComboBox);
 
-    DeviceList deviceList{};
-    deviceList.devices = nullptr;
-    deviceList.count   = 0;
+    DeviceList list{};
+    list.devices = nullptr;
+    list.count   = 0;
 
     if (enginePtr) {
         DeviceList list = get_output_devices(enginePtr);
         //qDebug() << "deviceList.count =" << deviceList.count;
-        const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
-        if (deviceList.devices && deviceList.count > 0) {
-            for (size_t i = 0; i < deviceList.count; i++) {
+        //const DeviceInfo* arr = reinterpret_cast<const DeviceInfo*>(deviceList.devices);
+        if (list.devices && list.count > 0) {
+            for (size_t i = 0; i < list.count; i++) {
                 auto di = reinterpret_cast<const DeviceInfo*>(list.devices)[i];
-                // Make a permanent copy of the C-string:
                 QString devName = QString::fromUtf8(di.name);
                 outputDeviceComboBox->addItem(devName, (qulonglong)di.index);
             }
@@ -39,8 +38,8 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     connect(outputDeviceComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &AudioSettingsDialog::onOutputDeviceChanged);
 
-    if (deviceList.devices) {
-        free_device_list(deviceList);
+    if (list.devices) {
+        free_device_list(list);
     }
 
     // Sample Rate
@@ -100,35 +99,25 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
 AudioSettingsDialog::~AudioSettingsDialog() {}
 
 void AudioSettingsDialog::applySettings() {
-    if (!enginePtr) {
+if (!enginePtr || !synthPtr) {
         reject();
         return;
     }
 
-    stop_scheduler(synthPtr);
-    audio_engine_stop(enginePtr);
-    
-    set_sample_rate(enginePtr, sampleRateSpinBox->value());
-    set_bit_depth(enginePtr, static_cast<unsigned short>(bitDepthSpinBox->value()));
-    
-    QString format = fileFormatComboBox->currentText();
-    set_file_format(enginePtr, format.toStdString().c_str());
-
-    if (format == "mp3") {
-        set_bit_rate(enginePtr, static_cast<unsigned int>(bitRateSpinBox->value()));
-    } else if (format == "flac") {
-        set_flac_compression(enginePtr, static_cast<uint8_t>(flacCompressionSlider->value()));
-    }
+    unsigned int newRate = sampleRateSpinBox->value();
+    unsigned short newBitDepth = static_cast<unsigned short>(bitDepthSpinBox->value());
+    QString fmt = fileFormatComboBox->currentText();
 
     int currentIndex = outputDeviceComboBox->currentIndex();
+    size_t devIndex = 0; // or default
     if (currentIndex >= 0) {
         QVariant val = outputDeviceComboBox->itemData(currentIndex);
-        size_t devIndex = val.value<qulonglong>();
-        set_output_device(enginePtr, devIndex);
+        devIndex = val.value<qulonglong>();
     }
 
-    audio_engine_start(enginePtr);
-    start_scheduler(synthPtr);
+    if (SynthUI* mainUi = qobject_cast<SynthUI*>(parentWidget())) {
+        mainUi->reinitializeAudio(newRate, newBitDepth, fmt, devIndex);
+    }
 
     accept();
 }
