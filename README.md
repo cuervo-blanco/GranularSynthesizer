@@ -55,9 +55,8 @@ have something to provide.
 As a sound designer myself, I built this for my own usage. I've worked in 
 projects before were I used the Pd patch that Andy Farnell wrote (see above),
 but I knew sooner or later that a more streamlined tool that could provided me 
-with high quality exports, better interpolation algorithms  would be a must in
-my tool kit.
+with high quality exports, better interpolation algorithms and ... a Rust
+backend (*wink* *wink*) would be a must in my tool kit.
 
 If this app helps you in your works, feel free to share any content. It would be
 a chance to showcase what this tool is capable of doing!
-
