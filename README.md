@@ -1,24 +1,10 @@
 # GranularSynth
-
-## NAME
-**GranularSynth** – A granular audio synthesizer designed for real-time 
-experimentation and manipulation of audio files.
-
-## SYNOPSIS
-`SynthApp` is an evolving project aimed at providing an intuitive interface 
-for granular synthesis. Currently, the app supports basic audio file loading, 
-waveform visualization, and parameter adjustments. However, it remains under 
-development, with various backend and frontend features requiring refinement.
-In the future we hope to make it a plugin to be used during production.
-
-## DESCRIPTION
-SynthApp is built with a two-part structure:
+The Synthesizer is built with a two-part structure:
 - **Backend**: Developed in Rust, handling audio synthesis and real-time processing.
 - **Frontend**: Written in C++ (Qt framework), providing an interactive graphical interface.
 
-The app enables users to experiment with granular synthesis through parameterized 
-controls like grain start, duration, pitch, and overlap, displayed in a 
-dynamically updating UI. 
+The app enables you to experiment with granular synthesis using controls like 
+grain start, duration, pitch, and overlap.
 
 This code is highly inspired by Andy Farnell's
 Designing Sound book's chapter:
@@ -27,106 +13,51 @@ Designing Sound book's chapter:
 I highly recommend reading this if you want to understand the goal of this
 application.
 
-You may ask : why a Rust backend and a C++ frontend? Why not all in JUCE?
-To which I answer: Where’s the spice? Where’s the drama? JUCE? Too mainstream, too predictable.
-All jokes aside, JUCE could have saved me a lot of headaches, but I wanted 
-to explore a different way of writing software through a hybrid approach.
+Unfortunately, at this moment only `.wav` files can be used as source material and
+as exporting material, but in future I plan to update for more formats (mp3, flac, etc.)...
+at least for importing.
 
+## What Needs Work
+- Handling multiple formats (mp3, flac, etc.).
+- Limited to your system's default audio devices for now...
+- Doesn't handle weird or broken audio files gracefully.
+- Everything in the backend is in need of some cleaning, and double checking.
+- Finishing the UI (uploading images and linking them through QSS)
+- Add flags to the install.sh script for specified build (i.e: only build frontend)
 
-## FEATURES
-### **Current Functionality**
-- Load `.wav` files for granular synthesis.
-- Adjustable synthesis parameters:
-  - **Grain Start**: Controls the starting point of grains within the audio file.
-  - **Grain Duration**: Sets the duration of individual grains.
-  - **Grain Pitch**: Adjusts the playback pitch of grains.
-  - **Overlap**: Determines the overlap between consecutive grains.
-- Visual feedback:
-  - **Waveform View**: Displays the loaded audio's waveform.
-  - **Envelope View**: Shows the grain envelope.
-  - **Selection Rectangles**: Highlights selected grain areas on the waveform.
-- Playback control: Play and stop audio playback.
+Hopefully in the near future I will provide a .exe or a .dmg, dockfile or an AppImage,
+but for now the only way to install the app is directly by cloning the repo. 
+Windows is untested. You'll definately need to install Qt.
 
-### **Known Issues**
-1. UI scaling inconsistencies when resizing the application window.
-2. Limited error handling for invalid audio files.
-3. Backend grain generation and scheduling need further optimization and edge case handling.
-4. Limited audio device support (dependent on system defaults).
-
-## STRUCTURE
-### **Backend** (`/backend`)
-- Entire backend functionality is encapsulated in `lib.rs`.
-- Key components:
-  - **GranularSynth**: Core structure for handling synthesis parameters and audio processing.
-  - **AudioEngine**: Manages the audio output stream and real-time scheduling.
-  - Utilities for waveform interpolation and envelope generation.
-
-### **Frontend** (`/frontend`)
-- Core UI logic in:
-  - `SynthUI.h`
-  - `SynthUI.cpp`
-  - `main.cpp`
-- Major UI features:
-  - Parameter sliders and buttons for interaction.
-  - Dynamic waveform and envelope rendering using Qt's `QGraphicsScene`.
-
-## REQUIREMENTS
-### **Backend**
-- Rust with dependencies: `cpal`, `hound`, `crossbeam-channel`, `dasp-signal`, `rand`.
-
-### **Frontend**
-- C++ with Qt framework (version 5 or higher).
-
-### **System**
-- Compatible with Linux, macOS, and Windows.
-
-## INSTALLATION
-### Backend
-1. Install Rust and Cargo from [rust-lang.org](https://www.rust-lang.org/).
-2. Build the Rust library:
+## Installation
+1. Clone the repo:
    ```bash
-   cd backend
-   cargo build --release
+   git clone https://github.com/cuervo-blanco/GranularSynthesizer.git
+   cd GranularSynth
+   ```
+2. Run the automated install script:
+   ```bash
+   ./install.sh
+   ```
+   - Use `--clean` if you want to clear previous builds.
+   - Use `--rebuild` to clean and rebuild everything from scratch.
+3. Ensure you have Qt installed. If not, download and install it from [Qt Downloads](https://www.qt.io/download). Make sure `qmake` is available in your PATH.
+4. After installation, run the app and start experimenting:
+   ```bash
+   ./GranularSynth
    ```
 
-### Frontend
-1. Install Qt (e.g., via [Qt Creator](https://www.qt.io/)).
-2. Compile the frontend application:
-   ```bash
-   cd frontend
-   qmake && make
-   ```
+## Want to Help?
+Contributions are more than welcome, they are needed! 
+So please, fork the repo, play some grains, and submit a pull request when you
+have something to provide.
 
-## USAGE
-1. Launch the application from the compiled binary.
-2. Load an audio file using the "Load Audio File" button.
-3. Adjust synthesis parameters using the sliders.
-4. Click "Play Audio" to hear the processed output.
-5. Stop playback with the "Stop Audio" button.
+As a sound designer myself, I built this for my own usage. I've worked in 
+projects before were I used the Pd patch that Andy Farnell wrote (see above),
+but I knew sooner or later that a more streamlined tool that could provided me 
+with high quality exports, better interpolation algorithms  would be a must in
+my tool kit.
 
-## CONTRIBUTING
-Contributions are welcome! Please:
-1. Fork the repository.
-2. Submit pull requests with detailed descriptions.
-3. Ensure changes are tested.
+If this app helps you in your works, feel free to share any content. It would be
+a chance to showcase what this tool is capable of doing!
 
-## TODO
-1. **Backend**
-   - Enhance grain scheduling and interpolation techniques.
-   - Improve performance for large audio files.
-   - Add support for additional audio formats.
-
-2. **Frontend**
-   - Improve UI scaling and responsiveness.
-   - Enhance visualizations for waveform and envelope displays.
-   - Implement more granular control over playback.
-
-3. **General**
-   - Comprehensive testing across platforms.
-   - Add documentation and tutorials.
-
-## LICENSE
-MIT License. See `LICENSE` file for details.
-
-## AUTHORS
-cuervo-blanco (Jaime Osvaldo)

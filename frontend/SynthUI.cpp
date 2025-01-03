@@ -40,7 +40,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     playButton = new QPushButton("Play", this);
-    playButton->setObjectName("playButton");
+    //playButton->setObjectName("playButton");
     playButton->setFixedSize(64, 64);
     connect(playButton, &QPushButton::clicked, 
             this, &SynthUI::onPlayAudioClicked);
