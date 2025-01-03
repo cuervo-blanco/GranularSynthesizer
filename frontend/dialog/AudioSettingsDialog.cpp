@@ -86,13 +86,15 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     QLabel *fileFormatLabel = new QLabel("File Format:", this);
     mainLayout->addWidget(fileFormatLabel);
     fileFormatComboBox = new QComboBox(this);
-    fileFormatComboBox->addItems({"wav", "mp3", "flac"});
+    fileFormatComboBox->addItems({"wav", "mp3"});
     int index = fileFormatComboBox->findText(formatStr);
     if (index != -1) {
         fileFormatComboBox->setCurrentIndex(index);
     } else {
         qDebug() << "Unknown format: " << formatStr;
     }
+
+
     mainLayout->addWidget(fileFormatComboBox);
 
     // Bit Rate (For MP3)
@@ -103,13 +105,25 @@ AudioSettingsDialog::AudioSettingsDialog(QWidget *parent, AudioEngine *engine, G
     bitRateSpinBox->setValue(128);
     mainLayout->addWidget(bitRateSpinBox);
 
-    // FLAC Compression Level
-    flacCompressionLabel = new QLabel("FLAC Compression Level:", this);
-    mainLayout->addWidget(flacCompressionLabel);
-    flacCompressionSlider = new QSlider(Qt::Horizontal, this);
-    flacCompressionSlider->setRange(0, 8);
-    flacCompressionSlider->setValue(5);
-    mainLayout->addWidget(flacCompressionSlider);
+    if (formatStr == "wav") {
+        bitRateLabel->hide();
+        bitRateSpinBox->hide();
+    } else if (formatStr == "mp3") {
+        bitRateLabel->show();
+        bitRateSpinBox->show();
+    }
+
+    connect(fileFormatComboBox, &QComboBox::currentTextChanged, this, [=](const QString &format) {
+        if (format == "mp3") {
+            bitRateLabel->show();
+            bitRateSpinBox->show();
+        } else {
+            bitRateLabel->hide();
+            bitRateSpinBox->hide();
+        }
+    });
+
+    fileFormatComboBox->setCurrentText(formatStr);
 
     // Apply and Cancel Buttons
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -139,6 +153,15 @@ void AudioSettingsDialog::applySettings() {
         //QVariant val = outputDeviceComboBox->itemData(selectedDeviceIndex);
         //devIndex = val.value<qulonglong>();
     //}
+    if (format == "mp3") {
+        QMessageBox::information(
+            this,
+            "Feature Not Available",
+            "MP3 format is currently unimplemented. Please select a different format.",
+            QMessageBox::Ok
+        );
+        return; // Exit the function without applying changes
+    }
 
     QMessageBox::StandardButton reply = QMessageBox::warning(
         this,

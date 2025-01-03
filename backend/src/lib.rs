@@ -144,7 +144,7 @@ pub struct ExportSettings {
     pub sample_rate: u32,
     pub bit_depth: u16,
     pub sample_format: hound::SampleFormat,
-    pub format: String, // "wav", "mp3", "flac", etc.
+    pub format: String, // "wav", "mp3"
     pub format_specific: Option<FormatSpecificSettings>,
 }
 
@@ -156,7 +156,7 @@ pub enum FormatSpecificSettings {
 
 pub enum Writers {
     WavWriter(hound::WavWriter<BufWriter<File>>),
-    // In the future, we could add Mp3Writer(...), FlacWriter(...), etc.
+    // implement other 
 }
 
 #[allow(dead_code)]
@@ -266,17 +266,6 @@ impl AudioEngine {
             // Possibly override or create new FormatSpecificSettings::Mp3Settings
             self.user_recording_settings.format_specific = 
                 Some(FormatSpecificSettings::Mp3Settings { bitrate });
-        }
-    }
-    
-    pub fn set_flac_compression(&mut self, level: u8) {
-        if let Some(FormatSpecificSettings::FlacSettings { ref mut compression }) =
-            self.user_recording_settings.format_specific
-        {
-            *compression = level;
-        } else {
-            self.user_recording_settings.format_specific =
-                Some(FormatSpecificSettings::FlacSettings { compression: level });
         }
     }
 
@@ -407,38 +396,10 @@ impl AudioEngine {
                     if let Some(ref mut writer) = *guard {
                         match &mut *writer {
                             Writers::WavWriter(wav_writer) => {
-                                match bit_depth {
-                                    // Needs to implement different formats better.
-                                    16 => {
-                                        for &sample in data.iter() {
-                                            let sample_i16 = (sample * std::i16::MAX as f32) as i16;
-                                            if let Err(e) = wav_writer.write_sample(sample_i16) {
-                                                eprintln!("Failed to write sample (16-bit): {}", e);
-                                            }
-                                        }
-                                    },
-                                    24 => {
-                                        for &sample in data.iter() {
-                                            // Convert f32 -> i32 and shift to 24-bit range
-                                            let sample_i32 = (sample * std::i32::MAX as f32) as i32;
-                                            if let Err(e) = wav_writer.write_sample(sample_i32) {
-                                                eprintln!("Failed to write sample (24-bit): {}", e);
-                                            }
-                                        }
-                                    },
-                                    32 => {
-                                        for &sample in data.iter() {
-                                            let sample_i32 = (sample * std::i32::MAX as f32) as i32;
-                                            if let Err(e) = wav_writer.write_sample(sample_i32) {
-                                                eprintln!("Failed to write sample (32-bit): {}", e);
-                                            }
-                                        }
-                                    },
-                                    _ => {
-                                        eprintln!("Unsupported bit depth: {}", bit_depth);
-                                    }
+                                if let Err(e) = AudioEngine::write_wav_samples(wav_writer, data, bit_depth) {
+                                    eprintln!("Error writing WAV samples: {}", e);
                                 }
-                            }
+                            },
                         }
                     } else {
                         println!("writer_for_callback == None, so no actual recording possible");
@@ -529,12 +490,6 @@ impl AudioEngine {
                     .map_err(|e| e.to_string())?;
                  *guard = Some(Writers::WavWriter(wav_writer));
             },
-            "mp3" => {
-                return Err("MP3 recording not implemented yet.".to_string());
-            },
-            "flac" => {
-                return Err("FLAC recording not implemented yet.".to_string());
-            },
             other => {
                 return Err(format!("Unsupported format for recording: {}", other));
             },
@@ -557,13 +512,41 @@ impl AudioEngine {
             //let writer = std::mem::replace(&mut writer_arc, &mut Writers::WavWriter(dummy_placeholder()));
             match writer {
                 Writers::WavWriter(wav_writer) => {
-                    println!("Finalizing WAV writer");
                     wav_writer.finalize().map_err(|e| e.to_string())?;
-                }
+                },
             }
         }
 
         *is_recording = false;
+        Ok(())
+    }
+
+    fn write_wav_samples(
+        wav_writer: &mut hound::WavWriter<std::io::BufWriter<std::fs::File>>,
+        data: &[f32],
+        bit_depth: u16,
+    ) -> Result<(), String> {
+        match bit_depth {
+            16 => {
+                for &sample in data.iter() {
+                    let sample_i16 = (sample * std::i16::MAX as f32) as i16;
+                    wav_writer.write_sample(sample_i16).map_err(|e| e.to_string())?;
+                }
+            }
+            24 => {
+                for &sample in data.iter() {
+                    let sample_i32 = (sample * (1 << 23) as f32) as i32; // Scale for 24-bit
+                    wav_writer.write_sample(sample_i32).map_err(|e| e.to_string())?;
+                }
+            }
+            32 => {
+                for &sample in data.iter() {
+                    let sample_i32 = (sample * std::i32::MAX as f32) as i32;
+                    wav_writer.write_sample(sample_i32).map_err(|e| e.to_string())?;
+                }
+            }
+            _ => return Err(format!("Unsupported bit depth: {}", bit_depth)),
+        }
         Ok(())
     }
 
@@ -1367,18 +1350,6 @@ pub extern "C" fn set_bit_rate(
         &mut *engine_ptr
     };
     engine.set_bit_rate(bitrate);
-}
-
-#[no_mangle]
-pub extern "C" fn set_flac_compression(
-    engine_ptr: *mut AudioEngine,
-    level: u8,
-) {
-    let engine = unsafe {
-        assert!(!engine_ptr.is_null());
-        &mut *engine_ptr
-    };
-    engine.set_flac_compression(level);
 }
 
 #[no_mangle]
