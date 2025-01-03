@@ -13,6 +13,7 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QDialog>
+#include <QDial>
 #include <QSpinBox>
 #include <QComboBox>
 #include <vector>
@@ -151,9 +152,9 @@ private:
     QPushButton *stopButton;
 
     QSlider *grainStartSlider;
-    QSlider *grainDurationSlider;
-    QSlider *grainPitchSlider;
-    QSlider *overlapSlider;
+    QDial *grainDurationDial;
+    QDial *grainPitchDial;
+    QDial *overlapDial;
 
     QLabel *grainStartLabel;
     QLabel *grainDurationLabel;
@@ -176,6 +177,7 @@ private:
     void drawFullWaveformOnce();
     void updateGrainSelectionRect();
     void resizeEvent(QResizeEvent* event) override;
+    void paintEvent(QPaintEvent *event) override;
     bool isPlaying = false;
 };
 

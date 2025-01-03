@@ -58,7 +58,7 @@ build_frontend() {
 
     if [ "$REBUILD" = true ]; then
         cmake ..
-        handle_error "cmake --build ."
+        cmake --build .
     else
         cmake --build .
     fi

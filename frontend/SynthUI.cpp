@@ -11,6 +11,9 @@
 #include <QPen>
 #include <algorithm>
 #include <cmath>
+#include <QPixmap>
+#include <QDebug>
+
 
 // Constructor
 SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
@@ -27,10 +30,13 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
     // Buttons
+    QHBoxLayout *topButtonLayout = new QHBoxLayout();
     loadFileButton = new QPushButton("Load WAV", this);
+    topButtonLayout->addWidget(loadFileButton);
+    topButtonLayout->addStretch(1);
     connect(loadFileButton, &QPushButton::clicked, 
             this, &SynthUI::onLoadFileClicked);
-    mainLayout->addWidget(loadFileButton);
+    mainLayout->addLayout(topButtonLayout);
 
     playButton = new QPushButton("Play", this);
     connect(playButton, &QPushButton::clicked, 
@@ -73,56 +79,60 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     
     // Sliders
-    QHBoxLayout *sliderLayout = new QHBoxLayout();
     grainStartLabel = new QLabel("Grain Start", this);
     grainStartSlider = new QSlider(Qt::Horizontal, this);
-    grainStartSlider->setRange(0,100);
+    grainStartSlider->setRange(0,1080);
     grainStartSlider->setValue(0);
     connect(grainStartSlider, &QSlider::sliderReleased, 
             this, &SynthUI::onGrainStartReleased);
     connect(grainStartSlider, &QSlider::valueChanged, 
             this, &SynthUI::onGrainStartValueChanged);
-    sliderLayout->addWidget(grainStartLabel);
-    sliderLayout->addWidget(grainStartSlider);
+
+    QHBoxLayout *grainStartLayout = new QHBoxLayout();
+    grainStartLayout->addWidget(grainStartLabel);
+    grainStartLayout->addWidget(grainStartSlider);
+    mainLayout->addLayout(grainStartLayout);
     grainStartSlider->setEnabled(false); 
 
+    // Knobs
+    QHBoxLayout *knobLayout = new QHBoxLayout();
     grainDurationLabel = new QLabel("Grain Duration", this);
-    grainDurationSlider = new QSlider(Qt::Horizontal, this);
-    grainDurationSlider->setRange(50, 1000);
-    grainDurationSlider->setValue(100);
-    connect(grainDurationSlider, &QSlider::sliderReleased, 
+    grainDurationDial = new QDial(this);
+    grainDurationDial->setRange(50, 1000);
+    grainDurationDial->setValue(100);
+    connect(grainDurationDial, &QDial::sliderReleased, 
             this, &SynthUI::onGrainDurationReleased);
-    connect(grainDurationSlider, &QSlider::valueChanged, 
+    connect(grainDurationDial, &QDial::valueChanged, 
             this, &SynthUI::onGrainDurationValueChanged);
-    sliderLayout->addWidget(grainDurationLabel);
-    sliderLayout->addWidget(grainDurationSlider);
-    grainDurationSlider->setEnabled(false); 
+    knobLayout->addWidget(grainDurationLabel);
+    knobLayout->addWidget(grainDurationDial);
+    grainDurationDial->setEnabled(false); 
 
     grainPitchLabel = new QLabel("Grain Pitch", this);
-    grainPitchSlider = new QSlider(Qt::Horizontal, this);
-    grainPitchSlider->setRange(1, 20);
-    grainPitchSlider->setValue(10);
-    connect(grainPitchSlider, &QSlider::sliderReleased, 
+    grainPitchDial = new QDial(this);
+    grainPitchDial->setRange(1, 20);
+    grainPitchDial->setValue(10);
+    connect(grainPitchDial, &QDial::sliderReleased, 
             this, &SynthUI::onGrainPitchReleased);
-    connect(grainPitchSlider, &QSlider::valueChanged, 
+    connect(grainPitchDial, &QDial::valueChanged, 
             this, &SynthUI::onGrainPitchValueChanged);
-    sliderLayout->addWidget(grainPitchLabel);
-    sliderLayout->addWidget(grainPitchSlider);
-    grainPitchSlider->setEnabled(false); 
+    knobLayout->addWidget(grainPitchLabel);
+    knobLayout->addWidget(grainPitchDial);
+    grainPitchDial->setEnabled(false); 
 
     overlapLabel = new QLabel("Overlap", this);
-    overlapSlider = new QSlider(Qt::Horizontal, this);
-    overlapSlider->setRange(10, 20);
-    overlapSlider->setValue(15);
-    connect(overlapSlider, &QSlider::sliderReleased, 
+    overlapDial = new QDial(this);
+    overlapDial->setRange(10, 20);
+    overlapDial->setValue(15);
+    connect(overlapDial, &QDial::sliderReleased, 
             this, &SynthUI::onOverlapReleased);
-    connect(overlapSlider, &QSlider::valueChanged, 
+    connect(overlapDial, &QDial::valueChanged, 
             this, &SynthUI::onOverlapValueChanged);
-    sliderLayout->addWidget(overlapLabel);
-    sliderLayout->addWidget(overlapSlider);
-    overlapSlider->setEnabled(false); 
+    knobLayout->addWidget(overlapLabel);
+    knobLayout->addWidget(overlapDial);
+    overlapDial->setEnabled(false); 
 
-    mainLayout->addLayout(sliderLayout);
+    mainLayout->addLayout(knobLayout);
 
     // Waveform 
     waveformLabel = new QLabel("Audio Waveform:", this);
@@ -157,6 +167,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     // Get default device index
     //int globalDeviceIndex = get_default_output_device_index();
+    //setStyleSheet("background-image: url(:/background.png); background-repeat: no-repeat; background-position: center;");
 
     generate_grain_envelope(synthPtr, 2048);
     updateEnvelopeDisplay();
@@ -300,17 +311,17 @@ void SynthUI::onLoadFileClicked() {
     generate_grain_envelope(synthPtr, 2048);
     
     grainStartSlider->setEnabled(true); 
-    grainDurationSlider->setEnabled(true); 
-    grainPitchSlider->setEnabled(true); 
-    overlapSlider->setEnabled(true); 
+    grainDurationDial->setEnabled(true); 
+    grainPitchDial->setEnabled(true); 
+    overlapDial->setEnabled(true); 
 
     playButton->setEnabled(true); 
     recordButton->setEnabled(true);
 
     grainStartSlider->setValue(0);
-    grainDurationSlider->setValue(100);
-    grainPitchSlider->setValue(10);
-    overlapSlider->setValue(15);
+    grainDurationDial->setValue(100);
+    grainPitchDial->setValue(10);
+    overlapDial->setValue(15);
 
     SourceArray array = get_source_array(synthPtr);
     std::vector<float> fullSamples(array.length);
@@ -326,32 +337,44 @@ void SynthUI::onLoadFileClicked() {
 
 void SynthUI::onGrainStartReleased() {
     int value = grainStartSlider->value();
-    float normalizedStart = static_cast<float>(value) / 100.0f;
+    float normalizedStart = static_cast<float>(value) / 1080.0f;
     set_grain_start(synthPtr, normalizedStart);
     if (isPlaying) {
         onPlayAudioClicked();
     }
 }
 void SynthUI::onGrainStartValueChanged() {
-    // Convert the 0 - 100 into a clock timer... somehow.
     int value = grainStartSlider->value();
-    if (value < 10) {
-        grainStartLabel->setText(QString("Grain Start:  %1").arg(value));
-    } else {
-        grainStartLabel->setText(QString("Grain Start: %1").arg(value));
-    }
+    SourceArray array = get_source_array(synthPtr);
+    size_t totalSamples = array.length;
+    int sampleRate = get_sample_rate(synthPtr);
+    free_source_array(array);
+
+    double totalDurationMs = static_cast<double>(totalSamples) / sampleRate * 1000.0;
+
+    double currentMs = (value / 100.0) * totalDurationMs;
+
+    int minutes = static_cast<int>(currentMs / 60000);
+    int seconds = static_cast<int>((currentMs / 1000)) % 60;
+    int milliseconds = static_cast<int>(currentMs) % 1000;
+
+    grainStartLabel->setText(QString("Grain Start: %1:%2:%3")
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0'))
+        .arg(milliseconds, 3, 10, QChar('0')));
+
     updateGrainSelectionRect();
 }
 
 void SynthUI::onGrainDurationReleased() {
-    int duration = grainDurationSlider->value();
+    int duration = grainDurationDial->value();
     set_grain_duration(synthPtr, duration);
     if (isPlaying) {
         onPlayAudioClicked();
     }
 }
 void SynthUI::onGrainDurationValueChanged() {
-    int value = grainDurationSlider->value();
+    int value = grainDurationDial->value();
     if (value < 1000) {
         grainDurationLabel->setText(QString("Grain Duration:   %1").arg(value));
     } else if (value < 10000) {
@@ -363,7 +386,7 @@ void SynthUI::onGrainDurationValueChanged() {
 }
 
 void SynthUI::onGrainPitchReleased() {
-    float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    float value = static_cast<float>(grainPitchDial->value()) / 10.0f;
     if (!synthPtr) {
         // Do something?
         return;
@@ -375,7 +398,7 @@ void SynthUI::onGrainPitchReleased() {
     }
 }
 void SynthUI::onGrainPitchValueChanged() {
-    float value = static_cast<float>(grainPitchSlider->value()) / 10.0f;
+    float value = static_cast<float>(grainPitchDial->value()) / 10.0f;
     if (value < 1) {
         grainPitchLabel->setText(QString("Grain Pitch:  %1").arg(value));
     } else {
@@ -384,7 +407,7 @@ void SynthUI::onGrainPitchValueChanged() {
 }
 
 void SynthUI::onOverlapReleased() {
-    int value = overlapSlider->value();
+    int value = overlapDial->value();
     float overlap = static_cast<float>(value) / 10.0f;
     if (!synthPtr) {
         // Do something?
@@ -397,7 +420,7 @@ void SynthUI::onOverlapReleased() {
     }
 }
 void SynthUI::onOverlapValueChanged() {
-    int value = overlapSlider->value();
+    int value = overlapDial->value();
     int overlap = value * 10 - 100;
     if (value < 10) {
         overlapLabel->setText(QString("Overlap: %1").arg(overlap));
@@ -428,14 +451,14 @@ void SynthUI::onPlayAudioClicked() {
     playButton->setEnabled(false); 
     stopButton->setEnabled(true); 
 
-    float normalizedStart = static_cast<float>(grainStartSlider->value()) / 100.0f;
-    float normalizedPitch = static_cast<float>(grainPitchSlider->value()) / 10.0f;
-    float normalizedOverlap= static_cast<float>(overlapSlider->value()) / 10.0f;
+    float normalizedStart = static_cast<float>(grainStartSlider->value()) / 1080.0f;
+    float normalizedPitch = static_cast<float>(grainPitchDial->value()) / 10.0f;
+    float normalizedOverlap= static_cast<float>(overlapDial->value()) / 10.0f;
     
     set_params(
         synthPtr,
         normalizedStart,
-        static_cast<size_t>(grainDurationSlider->value()),
+        static_cast<size_t>(grainDurationDial->value()),
         normalizedOverlap,
         normalizedPitch
     );
@@ -495,9 +518,9 @@ void SynthUI::updateGrainSelectionRect()
     double sceneWidth  = waveformView->width();
     double sceneHeight = waveformView->height();
 
-    double fractionStart = static_cast<double>(grainStartSlider->value()) / 100.0;
+    double fractionStart = static_cast<double>(grainStartSlider->value()) / 1080.0;
     int sample_rate = get_sample_rate(synthPtr);
-    double grainDurationSamples = static_cast<double>(grainDurationSlider->value()) / 1000.0 * sample_rate;
+    double grainDurationSamples = static_cast<double>(grainDurationDial->value()) / 1000.0 * sample_rate;
 
     double fractionDur = grainDurationSamples / static_cast<double>(totalSamples);
     if (fractionDur > 1.0) fractionDur = 1.0;
@@ -601,4 +624,14 @@ void SynthUI::resizeEvent(QResizeEvent* event){
     updateGrainSelectionRect();  // reposition rectangle
 }
 
-
+void SynthUI::paintEvent(QPaintEvent *event) {
+    QWidget::paintEvent(event);
+    QPainter painter(this);
+    QPixmap pix(":/images/background.png");
+    //QPixmap pix("/Users/astro/Documents/AudioDev/qt_rust_synth/frontend/images/background.png");
+    if (!pix.isNull()) {
+        painter.drawPixmap(this->rect(), pix);
+    } else {
+        qDebug() << "Failed to load background image!";
+    }
+}

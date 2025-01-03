@@ -1,5 +1,6 @@
 #include <QJsonObject>
 #include <QApplication>
+#include <QDebug>
 #include "SynthUI.h"
 #include "SettingsManager.h"
 
