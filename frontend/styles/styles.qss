@@ -1,0 +1,7 @@
+QPushButton#playButton {
+    border-image: url(:/images/buttons/play_enabled.png);
+}
+QPushButton#playButton:disabled {
+    border-image: url(:/images/buttons/play_disabled.png);
+}
+

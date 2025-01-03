@@ -168,6 +168,7 @@ private:
 
     void updateWaveformDisplay();
     void updateEnvelopeDisplay();
+    void updateRecordButtonsVisibility();
     void drawGrainSelectionRect(QGraphicsScene* scene,
                                 double sceneWidth,
                                 double sceneHeight,
@@ -179,6 +180,7 @@ private:
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent *event) override;
     bool isPlaying = false;
+    bool isRecording = false;
 };
 
 #endif // SYNTHUI_H

@@ -2,6 +2,9 @@
 <RCC version="1.0">
     <qresource prefix="/">
         <file>images/background.png</file>
+        <file>images/buttons/play_enabled.png</file>
+        <file>images/buttons/play_disabled.png</file>
+        <file>styles/styles.qss</file>
     </qresource>
 </RCC>
 

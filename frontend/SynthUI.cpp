@@ -38,29 +38,36 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
             this, &SynthUI::onLoadFileClicked);
     mainLayout->addLayout(topButtonLayout);
 
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
     playButton = new QPushButton("Play", this);
+    playButton->setObjectName("playButton");
+    playButton->setFixedSize(64, 64);
     connect(playButton, &QPushButton::clicked, 
             this, &SynthUI::onPlayAudioClicked);
     playButton->setEnabled(false); 
-    mainLayout->addWidget(playButton);
+    buttonLayout->addWidget(playButton);
 
     stopButton = new QPushButton("Stop", this);
     connect(stopButton, &QPushButton::clicked,
             this, &SynthUI::onStopAudioClicked);
     stopButton->setEnabled(false); 
-    mainLayout->addWidget(stopButton);
+    buttonLayout->addWidget(stopButton);
 
     recordButton = new QPushButton("Record", this);
     connect(recordButton, &QPushButton::clicked, 
             this, &SynthUI::onRecordClicked);
     recordButton->setEnabled(false); 
-    mainLayout->addWidget(recordButton);
+    recordButton->setVisible(!isRecording);
+    buttonLayout->addWidget(recordButton);
 
     stopRecordingButton = new QPushButton("Stop Recording", this);
     connect(stopRecordingButton, &QPushButton::clicked,
             this, &SynthUI::onStopRecordingClicked);
     stopRecordingButton->setEnabled(false); 
-    mainLayout->addWidget(stopRecordingButton);
+    buttonLayout->addWidget(stopRecordingButton);
+    stopRecordingButton->setVisible(isRecording);
+
+    mainLayout->addLayout(buttonLayout);
 
     // Menu Bar
     QMenuBar *menuBar = new QMenuBar(this);
@@ -79,7 +86,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     
     // Sliders
-    grainStartLabel = new QLabel("Grain Start", this);
+    grainStartLabel = new QLabel("Start", this);
     grainStartSlider = new QSlider(Qt::Horizontal, this);
     grainStartSlider->setRange(0,1080);
     grainStartSlider->setValue(0);
@@ -96,7 +103,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     // Knobs
     QHBoxLayout *knobLayout = new QHBoxLayout();
-    grainDurationLabel = new QLabel("Grain Duration", this);
+    grainDurationLabel = new QLabel("Duration", this);
     grainDurationDial = new QDial(this);
     grainDurationDial->setRange(50, 1000);
     grainDurationDial->setValue(100);
@@ -108,7 +115,7 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
     knobLayout->addWidget(grainDurationDial);
     grainDurationDial->setEnabled(false); 
 
-    grainPitchLabel = new QLabel("Grain Pitch", this);
+    grainPitchLabel = new QLabel("Pitch", this);
     grainPitchDial = new QDial(this);
     grainPitchDial->setRange(1, 20);
     grainPitchDial->setValue(10);
@@ -234,14 +241,6 @@ void SynthUI::onRecordClicked() {
         QMessageBox::warning(this, "Error", "No audio engine available!");
         return;
     }
-    //stop_scheduler(synthPtr);
-    //audio_engine_stop(enginePtr);
-    //destroy_audio_engine(enginePtr);
-    //enginePtr = nullptr;
-
-    //enginePtr = create_audio_engine(synthPtr);
-    //audio_engine_start(enginePtr);
-    //start_scheduler(synthPtr);
 
     QString filePath = QFileDialog::getSaveFileName(
             this,
@@ -256,7 +255,7 @@ void SynthUI::onRecordClicked() {
     QByteArray ba = filePath.toUtf8();
     int result = record(enginePtr, ba.constData());
     if (result == 0) {
-        printf("Sucessfully started recording");
+        updateRecordButtonsVisibility();
     }
     if (result != 0) {
         QMessageBox::critical(this, "Record Error", "Failed to begin recording");
@@ -270,7 +269,7 @@ void SynthUI::onStopRecordingClicked() {
     if (!enginePtr) return;
     int result = stop_recording(enginePtr);
     if (result == 0) {
-        printf("Sucessfully stopped recording");
+        updateRecordButtonsVisibility();
     }
     if (result != 0) {
         QMessageBox::critical(this, "Record Error", "Failed to stop recording!");
@@ -358,7 +357,7 @@ void SynthUI::onGrainStartValueChanged() {
     int seconds = static_cast<int>((currentMs / 1000)) % 60;
     int milliseconds = static_cast<int>(currentMs) % 1000;
 
-    grainStartLabel->setText(QString("Grain Start: %1:%2:%3")
+    grainStartLabel->setText(QString("Start: %1:%2:%3")
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0'))
         .arg(milliseconds, 3, 10, QChar('0')));
@@ -376,11 +375,11 @@ void SynthUI::onGrainDurationReleased() {
 void SynthUI::onGrainDurationValueChanged() {
     int value = grainDurationDial->value();
     if (value < 1000) {
-        grainDurationLabel->setText(QString("Grain Duration:   %1").arg(value));
+        grainDurationLabel->setText(QString("Duration:   %1").arg(value));
     } else if (value < 10000) {
-        grainDurationLabel->setText(QString("Grain Duration:  %1").arg(value));
+        grainDurationLabel->setText(QString("Duration:  %1").arg(value));
     } else {
-        grainDurationLabel->setText(QString("Grain Duration: %1").arg(value));
+        grainDurationLabel->setText(QString("Duration: %1").arg(value));
     }
     updateGrainSelectionRect();
 }
@@ -400,9 +399,9 @@ void SynthUI::onGrainPitchReleased() {
 void SynthUI::onGrainPitchValueChanged() {
     float value = static_cast<float>(grainPitchDial->value()) / 10.0f;
     if (value < 1) {
-        grainPitchLabel->setText(QString("Grain Pitch:  %1").arg(value));
+        grainPitchLabel->setText(QString("Pitch:  %1").arg(value));
     } else {
-        grainPitchLabel->setText(QString("Grain Pitch: %1").arg(value));
+        grainPitchLabel->setText(QString("Pitch: %1").arg(value));
     }
 }
 
@@ -569,6 +568,12 @@ void SynthUI::updateEnvelopeDisplay() {
     } else {
         grainEnvelopeScene->addText("No envelope data!");
     }
+}
+
+void SynthUI::updateRecordButtonsVisibility() {
+    isRecording = !isRecording;
+    recordButton->setVisible(!isRecording);
+    stopRecordingButton->setVisible(isRecording);
 }
 
 void SynthUI::drawGrainSelectionRect(

@@ -1,11 +1,18 @@
 #include <QJsonObject>
 #include <QApplication>
 #include <QDebug>
+#include <QFile>
 #include "SynthUI.h"
 #include "SettingsManager.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
+
+    QFile file(":/styles/styles.qss");
+    if (file.open(QFile::ReadOnly)) {
+        QString styleSheet = QLatin1String(file.readAll());
+        app.setStyleSheet(styleSheet);
+    }
 
     QJsonObject settings = SettingsManager::loadSettings();
     unsigned int sampleRate = settings.value("sample_rate").toInt(48000);
