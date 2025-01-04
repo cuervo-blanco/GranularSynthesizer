@@ -54,6 +54,14 @@ build_frontend() {
     fi
 
     echo "Running cmake and building frontend..."
+
+    if [ ! -d "frontend/build" ]; then
+        echo "Directory 'frontend/build' does not exist. Creating it now..."
+        mkdir -p frontend/build
+    else
+        echo "Directory 'frontend/build' already exists."
+    fi
+
     cd build || exit 1
 
     if [ "$REBUILD" = true ]; then
