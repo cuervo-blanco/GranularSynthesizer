@@ -1,0 +1,74 @@
+name: Build macOS Installer
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          # Install Homebrew if not available
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          brew install qt cmake
+          rustup install stable
+          rustup default stable
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo install cargo-lipo
+
+      - name: Run installation script
+        run: |
+          chmod +x ./install.sh
+          ./install.sh
+
+      - name: Bundle .app with macdeployqt
+        run: |
+          macdeployqt frontend/build/Bundles/GranularSynth.app
+
+      - name: Create .dmg file
+        run: |
+          mkdir -p installers/macos
+          hdiutil create -volname GranularSynth \
+                         -srcfolder frontend/build/Bundles/GranularSynth.app \
+                         -ov -format UDZO \
+                         installers/macos/GranularSynth.dmg
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: GranularSynth-macos
+          path: installers/macos/GranularSynth.dmg
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: GranularSynth ${{ github.ref_name }}
+          body: "Release for GranularSynth ${{ github.ref_name }}."
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: installers/macos/GranularSynth.dmg
+          asset_name: GranularSynth.dmg
+          asset_content_type: application/octet-stream
+
