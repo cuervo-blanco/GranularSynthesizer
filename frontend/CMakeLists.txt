@@ -30,7 +30,6 @@ if(NOT RUST_LIB)
 endif()
 
 find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
-
 find_library(COREAUDIO_LIBRARY CoreAudio)
 
 qt_add_executable(GranularSynth
@@ -61,8 +60,6 @@ add_custom_command(TARGET GranularSynth POST_BUILD
             ${CMAKE_SOURCE_DIR}/resources
             ${CMAKE_BINARY_DIR}/Bundles/GranularSynth.app/Contents/Resources
 )
-
-
 
 target_link_libraries(GranularSynth PRIVATE
     ${AUDIOTOOLBOX_LIBRARY}

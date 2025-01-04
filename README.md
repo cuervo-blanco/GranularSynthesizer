@@ -27,7 +27,9 @@ application.
 - Add flags to the install.sh script for specified build (i.e: only build frontend)
 
 There are a two ways to install this App: directly through an executable
-provided at  [Installes Directory](./installers/) or cloning the repo and following the steps below.
+provided in the [Releases](https://github.com/cuervo-blanco/GranularSynthesizer/releases) page, 
+or cloning the repo and following the steps below.
+
 At this moment only Linux and MacOS are implemented, Windows will be setup
 properly soon.
 
