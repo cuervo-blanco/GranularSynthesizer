@@ -1,15 +1,17 @@
 [package]
 name = "backend"
-version = "0.1.1"
+version = "1.0.0"
 edition = "2021"
 authors = ["Cuervo Blanco"]
 description = "DSP backend for a Granular Synth"
 license = "MIT" 
-repository = "n/a" 
+repository = "https://github.com/cuervo-blanco/GranularSynthesizer.git" 
 documentation = "n/a" 
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
+
+target = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
 
 [dependencies]
 cpal = "0.15.3"

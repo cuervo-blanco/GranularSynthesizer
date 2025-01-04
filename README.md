@@ -3,8 +3,13 @@ The Synthesizer is built with a two-part structure:
 - **Backend**: Developed in Rust, handling audio synthesis and real-time processing.
 - **Frontend**: Written in C++ (Qt framework), providing an interactive graphical interface.
 
-The app enables you to experiment with granular synthesis using controls like 
-grain start, duration, pitch, and overlap.
+Besides being able to control Granular Synthesis parameters such as duration of
+grains, pitch, overlap, and start, the most important feature of this
+Application is to export your work into a .wav file.
+
+Unfortunately, at this moment only `.wav` files can be used as source material and
+as exporting format, but in the future I plan to update for more formats (mp3, flac, etc.)...
+at least for importing.
 
 This code is highly inspired by Andy Farnell's
 Designing Sound book's chapter:
@@ -12,10 +17,6 @@ Designing Sound book's chapter:
 
 I highly recommend reading this if you want to understand the goal of this
 application.
-
-Unfortunately, at this moment only `.wav` files can be used as source material and
-as exporting material, but in future I plan to update for more formats (mp3, flac, etc.)...
-at least for importing.
 
 ## What Needs Work
 - Handling multiple formats (mp3, flac, etc.).
@@ -25,27 +26,95 @@ at least for importing.
 - Finishing the UI (uploading images and linking them through QSS)
 - Add flags to the install.sh script for specified build (i.e: only build frontend)
 
-Hopefully in the near future I will provide a .exe or a .dmg, dockfile or an AppImage,
-but for now the only way to install the app is directly by cloning the repo. 
-Windows is untested. You'll definately need to install Qt.
+There are a two ways to install this App: directly through an executable
+provided at  [Installes Directory](./installers/) or cloning the repo and following the steps below.
+At this moment only Linux and MacOS are implemented, Windows will be setup
+properly soon.
 
-## Installation
-1. Clone the repo:
+## Installation (Build from Source)
+
+### **1. Clone the Repository**
+Clone the repository and navigate to the project directory:
+```bash
+git clone https://github.com/cuervo-blanco/GranularSynthesizer.git
+cd GranularSynthesizer
+```
+---
+
+### **2. Install Dependencies**
+
+#### **macOS**
+1. Install [Homebrew](https://brew.sh) if not already installed:
    ```bash
-   git clone https://github.com/cuervo-blanco/GranularSynthesizer.git
-   cd GranularSynth
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
-2. Run the automated install script:
+2. Install required tools and libraries:
    ```bash
-   ./install.sh
+   brew install rustup cmake qt
    ```
-   - Use `--clean` if you want to clear previous builds.
-   - Use `--rebuild` to clean and rebuild everything from scratch.
-3. Ensure you have Qt installed. If not, download and install it from [Qt Downloads](https://www.qt.io/download). Make sure `qmake` is available in your PATH.
-4. After installation, run the app and start experimenting:
+   - `rustup` for Rust and `cargo`.
+   - `cmake` for building the C++ frontend.
+   - `qt` for the Qt framework (`macdeployqt` is included).
+
+3. Configure Rust:
    ```bash
-   ./GranularSynth
+   rustup install stable
+   rustup default stable
+   rustup target add x86_64-apple-darwin aarch64-apple-darwin
+   cargo install cargo-lipo
    ```
+
+#### **Linux**
+1. Install dependencies using your package manager:
+   ```bash
+   sudo apt-get update
+   sudo apt-get install build-essential cmake qt6-base-dev rustc cargo
+   ```
+   - On other distributions, replace `apt-get` with your package manager (e.g., `dnf`, `pacman`).
+
+2. Configure Rust:
+   ```bash
+   rustup install stable
+   rustup default stable
+   rustup target add x86_64-unknown-linux-gnu
+   ```
+---
+
+### **3. Build the Application**
+
+Run the automated install script to build the application:
+```bash
+./install.sh
+```
+
+#### **Script Options**
+- Use `--clean` to clear previous builds:
+  ```bash
+  ./install.sh --clean
+  ```
+- Use `--rebuild` to clean and rebuild everything from scratch:
+  ```bash
+  ./install.sh --rebuild
+  ```
+---
+
+### **4. Run the Application**
+After the build completes, run the app:
+```bash
+./GranularSynth
+```
+---
+
+### **5. Notes**
+- **Qt Environment Setup:**  
+  Ensure the `qmake` and `macdeployqt` commands are in your PATH. 
+  If you used Homebrew or a package manager, this should be configured automatically.
+  
+- **Linux Testing:**  
+  Linux compatibility has not been thoroughly tested yet. 
+  If you encounter issues, please submit them via [Issues](https://github.com/cuervo-blanco/GranularSynthesizer/issues).
+
+
 
 ## Want to Help?
 Contributions are more than welcome, they are needed! 
