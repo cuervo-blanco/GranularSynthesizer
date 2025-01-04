@@ -57,7 +57,7 @@ build_frontend() {
 
     if [ ! -d "build" ]; then
         echo "Directory 'build' does not exist. Creating it now..."
-        mkdir -p frontend/build
+        mkdir -p build
     else
         echo "Directory 'build' already exists."
     fi
@@ -68,6 +68,7 @@ build_frontend() {
         cmake ..
         cmake --build .
     else
+        cmake ..
         cmake --build .
     fi
 

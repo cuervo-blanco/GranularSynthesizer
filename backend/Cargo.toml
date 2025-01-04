@@ -11,8 +11,6 @@ documentation = "n/a"
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
-target = ["x86_64-apple-darwin", "aarch64-apple-darwin"]
-
 [dependencies]
 cpal = "0.15.3"
 crossbeam-channel = "0.5.14"
