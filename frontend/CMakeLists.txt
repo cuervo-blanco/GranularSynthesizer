@@ -30,6 +30,5 @@ target_include_directories(QtRustSynth PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/settings
     ${CMAKE_CURRENT_SOURCE_DIR}/dialog
-    ${CMAKE_CURRENT_SOURCE_DIR}/images
 )
 target_link_libraries(QtRustSynth PRIVATE Qt6::Widgets)

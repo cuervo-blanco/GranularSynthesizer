@@ -32,6 +32,9 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
     // Buttons
     QHBoxLayout *topButtonLayout = new QHBoxLayout();
     loadFileButton = new QPushButton("Load WAV", this);
+    loadFileButton->setObjectName("loadFileButton");
+    loadFileButton->setIcon(QIcon(":/images/buttons/load_inactive.svg"));
+    loadFileButton->setIconSize(QSize(32, 32));
     topButtonLayout->addWidget(loadFileButton);
     topButtonLayout->addStretch(1);
     connect(loadFileButton, &QPushButton::clicked, 
@@ -40,30 +43,65 @@ SynthUI::SynthUI(QWidget *parent) : QWidget(parent), loadedFilePath("") {
 
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     playButton = new QPushButton("Play", this);
-    //playButton->setObjectName("playButton");
+    playButton->setObjectName("playButton");
     playButton->setFixedSize(64, 64);
+     playButton->setIcon(QIcon(":/images/buttons/play_inactive.svg"));
+    playButton->setIconSize(QSize(32, 32));
+    playButton->setEnabled(false); 
+    connect(playButton, &QPushButton::pressed, [this]() {
+        playButton->setIcon(QIcon(":/images/buttons/play_pressed.svg"));
+    });
+    connect(playButton, &QPushButton::released, [this]() {
+        playButton->setIcon(QIcon(":/images/buttons/play_hover.svg"));
+    });
     connect(playButton, &QPushButton::clicked, 
             this, &SynthUI::onPlayAudioClicked);
-    playButton->setEnabled(false); 
     buttonLayout->addWidget(playButton);
 
     stopButton = new QPushButton("Stop", this);
+    stopButton->setObjectName("stopButton");
+    stopButton->setIcon(QIcon(":/images/buttons/stop_inactive.svg"));
+    stopButton->setIconSize(QSize(32, 32));
+    stopButton->setEnabled(false); 
+    connect(stopButton, &QPushButton::pressed, [this]() {
+        stopButton->setIcon(QIcon(":/images/buttons/stop_pressed.svg"));
+    });
+    connect(stopButton, &QPushButton::released, [this]() {
+        stopButton->setIcon(QIcon(":/images/buttons/stop_hover.svg"));
+    });
     connect(stopButton, &QPushButton::clicked,
             this, &SynthUI::onStopAudioClicked);
-    stopButton->setEnabled(false); 
     buttonLayout->addWidget(stopButton);
 
     recordButton = new QPushButton("Record", this);
+    recordButton->setObjectName("recordButton");
+    recordButton->setIcon(QIcon(":/images/buttons/record_inactive.svg"));
+    recordButton->setIconSize(QSize(32, 32));
+    recordButton->setEnabled(false); 
+    connect(recordButton, &QPushButton::pressed, [this]() {
+        recordButton->setIcon(QIcon(":/images/buttons/record_pressed.svg"));
+    });
+    connect(recordButton, &QPushButton::released, [this]() {
+        recordButton->setIcon(QIcon(":/images/buttons/record_hover.svg"));
+    });
     connect(recordButton, &QPushButton::clicked, 
             this, &SynthUI::onRecordClicked);
-    recordButton->setEnabled(false); 
     recordButton->setVisible(!isRecording);
     buttonLayout->addWidget(recordButton);
 
     stopRecordingButton = new QPushButton("Stop Recording", this);
+    stopRecordingButton->setObjectName("stopRecordingButton");
+    stopRecordingButton->setIcon(QIcon(":/images/buttons/pause_inactive.svg"));
+    stopRecordingButton->setIconSize(QSize(32, 32));
+    stopRecordingButton->setEnabled(false); 
+    connect(stopRecordingButton, &QPushButton::pressed, [this]() {
+        stopRecordingButton->setIcon(QIcon(":/images/buttons/pause_pressed.svg"));
+    });
+    connect(stopRecordingButton, &QPushButton::released, [this]() {
+        stopRecordingButton->setIcon(QIcon(":/images/buttons/pause_hover.svg"));
+    });
     connect(stopRecordingButton, &QPushButton::clicked,
             this, &SynthUI::onStopRecordingClicked);
-    stopRecordingButton->setEnabled(false); 
     buttonLayout->addWidget(stopRecordingButton);
     stopRecordingButton->setVisible(isRecording);
 

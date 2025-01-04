@@ -1,7 +1,55 @@
-QPushButton#playButton {
-    border-image: url(:/images/buttons/play_enabled.png);
+
+/* Slider styling */
+QSlider::groove:horizontal {
+    background: #3e3e3e;
+    height: 6px;
+    border-radius: 3px;
 }
-QPushButton#playButton:disabled {
-    border-image: url(:/images/buttons/play_disabled.png);
+
+QSlider::handle:horizontal {
+    background: #2b2b2b;
+    border: 1px solid #6c6c6c;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #3e3e3e;
+}
+
+QSlider::sub-page:horizontal {
+    background: #4e4e4e;
+    border-radius: 3px;
+}
+
+QSlider::add-page:horizontal {
+    background: #2b2b2b;
+}
+
+/* Dial styling */
+QDial {
+    background-color: #1c1c1c;
+    border: 2px solid #3e3e3e;
+    border-radius: 50%;
+    color: #6c6c6c;
+}
+
+QDial:focus {
+    background-color: #2b2b2b;
+    border: 2px solid #e0e0e0;
+    color: #ffffff;
+}
+
+/* Labels */
+QLabel {
+    color: #e0e0e0;
+    font-size: 14px;
+}
+
+/* Graphics Views */
+QGraphicsView {
+    border: 1px solid #3e3e3e;
+    background-color: #1c1c1c;
 }
 

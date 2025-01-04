@@ -1,10 +1,34 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="/">
-        <file>images/background.png</file>
-        <file>images/buttons/play_enabled.png</file>
-        <file>images/buttons/play_disabled.png</file>
         <file>styles/styles.qss</file>
+        <file>images/background.png</file>
+        <file>images/logo.png</file>
+        <file>images/buttons/load-button.svg</file>
+        <file>images/buttons/load_hover.svg</file>
+        <file>images/buttons/load_inactive.svg</file>
+        <file>images/buttons/load_pressed.svg</file>
+        <file>images/buttons/load_record.svg</file>
+        <file>images/buttons/pause-button.svg</file>
+        <file>images/buttons/pause_hover.svg</file>
+        <file>images/buttons/pause_inactive.svg</file>
+        <file>images/buttons/pause_pressed.svg</file>
+        <file>images/buttons/pause_record.svg</file>
+        <file>images/buttons/play-button.svg</file>
+        <file>images/buttons/play_hover.svg</file>
+        <file>images/buttons/play_inactive.svg</file>
+        <file>images/buttons/play_pressed.svg</file>
+        <file>images/buttons/play_record.svg</file>
+        <file>images/buttons/record-button.svg</file>
+        <file>images/buttons/record_hover.svg</file>
+        <file>images/buttons/record_inactive.svg</file>
+        <file>images/buttons/record_pressed.svg</file>
+        <file>images/buttons/record_record.svg</file>
+        <file>images/buttons/stop-button.svg</file>
+        <file>images/buttons/stop_hover.svg</file>
+        <file>images/buttons/stop_inactive.svg</file>
+        <file>images/buttons/stop_pressed.svg</file>
+        <file>images/buttons/stop_record.svg</file>
     </qresource>
 </RCC>
 
