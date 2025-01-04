@@ -13,6 +13,8 @@ on:
 jobs:
   build-macos:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -55,7 +57,6 @@ jobs:
           body: "Release for GranularSynth ${{ github.ref_name }}."
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Asset
         if: startsWith(github.ref, 'refs/tags/')
@@ -65,4 +66,3 @@ jobs:
           asset_path: frontend/build/GranularSynth.dmg
           asset_name: GranularSynth.dmg
           asset_content_type: application/octet-stream
-          token: ${{ secrets.GITHUB_TOKEN }}
