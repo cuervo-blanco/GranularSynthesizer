@@ -33,7 +33,7 @@ jobs:
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
           brew install cmake
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
           echo 'export PATH="~/.cargo/rustup/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
@@ -42,8 +42,8 @@ jobs:
           hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
           /Volumes/qt-online-installer-macOS-x64-4.8.1/qt-online-installer-macOS-x64-4.8.1.app/Contents/MacOS/qt-online-installer-macOS-x64-4.8.1 install -t ~/Qt -m "$QT_EMAIL" --pw "$QT_PASSWORD" --accept-licenses —accept-obligations --default-answer --auto-answer telemetry-question=No,AssociateCommonFiletypes=No --confirm-command --verbose
           rustup-init -y
-          rustup install stable
-          rustup default stable
+          rustup install stable -y
+          rustup default stable -y
 
       - name: Build Rust Backend (Intel)
         run: |
