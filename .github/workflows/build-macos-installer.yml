@@ -32,6 +32,9 @@ jobs:
           rustup-init -y
           rustup install stable
           rustup default stable
+          QT_PATH=$(find ~/Qt -type d -name "macos" | sort | tail -n 1)
+          QT_PATH=$(qtpaths --qt-install-path)
+          echo "CMAKE_PREFIX_PATH=$QT_PATH" >> $GITHUB_ENV
 
       - name: Build Rust Backend (Intel)
         run: |
@@ -43,8 +46,8 @@ jobs:
           eval "$(/usr/local/bin/brew shellenv)"
           mkdir -p $FRONTEND_DIR
           cd $FRONTEND_DIR
-          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) -DCMAKE_OSX_ARCHITECTURES="x86_64" ..
-          cmake --build . --config Release
+          cmake ..
+          cmake -DCMAKE_PREFIX_PATH="$QT_PATH" -S . -B build
 
       - name: Bundle .app with macdeployqt (Intel)
         run: |
@@ -81,6 +84,9 @@ jobs:
           rustup-init -y
           rustup install stable
           rustup default stable
+          QT_PATH=$(find ~/Qt -type d -name "macos" | sort | tail -n 1)
+          QT_PATH=$(qtpaths --qt-install-path)
+          echo "CMAKE_PREFIX_PATH=$QT_PATH" >> $GITHUB_ENV
 
       - name: Build Rust Backend (ARM)
         run: |
@@ -92,8 +98,8 @@ jobs:
           eval "$(/opt/homebrew/bin/brew shellenv)"
           mkdir -p $FRONTEND_DIR
           cd $FRONTEND_DIR
-          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) -DCMAKE_OSX_ARCHITECTURES="arm64" ..
-          cmake --build . --config Release
+          cmake ..
+          cmake -DCMAKE_PREFIX_PATH="$QT_PATH" -S . -B build
 
       - name: Bundle .app with macdeployqt (ARM)
         run: |
