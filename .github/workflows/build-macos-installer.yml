@@ -16,6 +16,10 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      BACKEND_DIR: backend
+      FRONTEND_DIR: frontend/build
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -33,33 +37,32 @@ jobs:
 
       - name: Build Rust Backend
         run: |
-          cd backend
+          cd $BACKEND_DIR
           cargo build --release --target=x86_64-apple-darwin
           cargo build --release --target=aarch64-apple-darwin
-          mkdir -p backend/target/universal/release
+          mkdir -p target/universal/release
           lipo -create \
-              backend/target/x86_64-apple-darwin/release/libbackend.a \
-              backend/target/aarch64-apple-darwin/release/libbackend.a \
-              -output backend/target/universal/release/libbackend.a
+              target/x86_64-apple-darwin/release/libbackend.a \
+              target/aarch64-apple-darwin/release/libbackend.a \
+              -output target/universal/release/libbackend.a
 
       - name: Build C++ frontend
         run: |
-          cd ..
           mkdir -p frontend/build
-          cd frontend/build
+          cd $FRONTEND_DIR
           cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
           cmake --build . --config Release
 
       - name: Bundle .app with macdeployqt
         run: |
-          macdeployqt frontend/build/Bundles/GranularSynth.app
+          macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app
 
       - name: Create .dmg file
         run: |
           hdiutil create -volname GranularSynth \
-                         -srcfolder frontend/build/Bundles/GranularSynth.app \
+                         -srcfolder $FRONTEND_DIR/Bundles/GranularSynth.app \
                          -ov -format UDZO \
-                         frontend/build/GranularSynth.dmg
+                         $FRONTEND_DIR/GranularSynth.dmg
 
       - name: Create GitHub Release
         id: create_release
