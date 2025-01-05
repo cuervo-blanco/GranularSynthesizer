@@ -33,7 +33,6 @@ jobs:
           rustup install stable
           rustup default stable
           QT_PATH=$(find ~/Qt -type d -name "macos" | sort | tail -n 1)
-          QT_PATH=$(qtpaths --qt-install-path)
           echo "CMAKE_PREFIX_PATH=$QT_PATH" >> $GITHUB_ENV
 
       - name: Build Rust Backend (Intel)
@@ -85,7 +84,6 @@ jobs:
           rustup install stable
           rustup default stable
           QT_PATH=$(find ~/Qt -type d -name "macos" | sort | tail -n 1)
-          QT_PATH=$(qtpaths --qt-install-path)
           echo "CMAKE_PREFIX_PATH=$QT_PATH" >> $GITHUB_ENV
 
       - name: Build Rust Backend (ARM)
