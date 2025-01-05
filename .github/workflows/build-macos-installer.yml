@@ -50,7 +50,7 @@ jobs:
           fi
 
           mkdir ~/Qt
-          curl -L -O $QT_INSTALL_PATH
+          curl -L -O "$QT_INSTALL_PATH"
           hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
           /Volumes/qt-online-installer-macOS-x64-4.8.1/qt-online-installer-macOS-x64-4.8.1.app/Contents/MacOS/qt-online-installer-macOS-x64-4.8.1 install -t ~/Qt -m "$QT_EMAIL" --pw "$QT_PASSWORD" --accept-licenses —accept-obligations --default-answer --auto-answer telemetry-question=No,AssociateCommonFiletypes=No --confirm-command --verbose
 
