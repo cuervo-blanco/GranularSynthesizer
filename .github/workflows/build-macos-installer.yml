@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-12
+    runs-on: macos-latest
     permissions:
       contents: write
 
@@ -24,6 +24,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license
+
+      - name: Install x86_64 Dependencies
+        run: |
+          arch -x86_64 brew install qt
+
       - name: Install dependencies
         run: |
           # Install Homebrew if not available
@@ -31,7 +38,6 @@ jobs:
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           fi
           brew install qt cmake
-          brew reinstall qt --build-bottle --universal
           rustup install stable
           rustup default stable
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
