@@ -30,7 +30,6 @@ jobs:
 
       - name: Install Dependencies
         run: |
-
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
           brew install cmake
@@ -41,8 +40,8 @@ jobs:
           echo 'export PATH="~/.cargo/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
 
-          rustup install stable-x86_64-apple-darwin -y
-          rustup default stable-x86_64-apple-darwin -y
+          rustup install stable-x86_64-apple-darwin
+          rustup default stable-x86_64-apple-darwin
 
           echo "QT_INSTALL_PATH: $QT_INSTALL_PATH"
           if [ -z "$QT_INSTALL_PATH" ]; then
