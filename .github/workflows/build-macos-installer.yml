@@ -30,7 +30,9 @@ jobs:
           if ! command -v brew &> /dev/null; then
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           fi
-          brew install qt cmake
+          brew install qt --universal
+          file /opt/homebrew/Cellar/qt/6.7.3/lib/QtWidgets.framework/QtWidgets
+          brew install cmake
           rustup install stable
           rustup default stable
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
