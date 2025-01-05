@@ -27,17 +27,21 @@ jobs:
       - name: Install Rosetta
         run: softwareupdate --install-rosetta --agree-to-license
 
-      - name: Install x86_64 Dependencies
+      - name: Install x86_64 Homebrew
         run: |
-          arch -x86_64 brew install qt
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-      - name: Install dependencies
+      - name: Switch to x86_64 Homebrew
         run: |
-          # Install Homebrew if not available
-          if ! command -v brew &> /dev/null; then
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          fi
+          eval "$(/usr/local/bin/brew shellenv)"
           brew install qt cmake
+
+
+      - name: Install ARM Homebrew Dependencies
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          brew install cmake rustup-init
+          rustup-init -y
           rustup install stable
           rustup default stable
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
@@ -55,6 +59,7 @@ jobs:
 
       - name: Build C++ frontend
         run: |
+          eval "$(/usr/local/bin/brew shellenv)"
           mkdir -p frontend/build
           cd $FRONTEND_DIR
           cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
@@ -62,6 +67,7 @@ jobs:
 
       - name: Bundle .app with macdeployqt
         run: |
+          eval "$(/usr/local/bin/brew shellenv)"
           macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app
 
       - name: Create .dmg file
