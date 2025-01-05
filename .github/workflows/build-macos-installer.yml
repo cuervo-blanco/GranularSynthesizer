@@ -30,12 +30,23 @@ jobs:
           rustup install stable
           rustup default stable
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
-          cargo install cargo-lipo
 
       - name: Run installation script
         run: |
-          chmod +x ./install.sh
-          ./install.sh
+          cargo build --release --target=x86_64-apple-darwin
+          cargo build --release --target=aarch64-apple-darwin
+          mkdir -p backend/target/universal/release
+          lipo -create \
+              backend/target/x86_64-apple-darwin/release/libbackend.a \
+              backend/target/aarch64-apple-darwin/release/libbackend.a \
+              -output backend/target/universal/release/libbackend.a
+
+      - name: Build C++ frontend
+        run: |
+          mkdir -p frontend/build
+          cd frontend/build
+          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
+          cmake --build . --config Release
 
       - name: Bundle .app with macdeployqt
         run: |
@@ -59,6 +70,7 @@ jobs:
           body: "Release for GranularSynth ${{ github.ref_name }}."
           draft: false
           prerelease: false
+
       - name: Upload Release Asset
         id: upload-release-asset 
         uses: actions/upload-release-asset@v1

@@ -37,8 +37,20 @@ build_backend() {
         cargo clean
     fi
 
-    echo "Running cargo build --release for backend..."
-    cargo build --release
+    echo "Building for Intel macOS..."
+    cargo build --release --target=x86_64-apple-darwin || exit 1
+
+    echo "Building for Apple Silicon macOS..."
+    cargo build --release --target=aarch64-apple-darwin || exit 1
+
+    echo "Merging into universal binary..."
+    mkdir -p target/universal/release
+    lipo -create \
+        target/x86_64-apple-darwin/release/libbackend.a \
+        target/aarch64-apple-darwin/release/libbackend.a \
+        -output target/universal/release/libbackend.a || exit 1
+
+    echo "Universal binary created at target/universal/release/libbackend.a"
 
     cd - || exit 1
 }

@@ -15,15 +15,17 @@ set(BUNDLE_IDENTIFIER "com.cuervoblanco.GranularSynth")
 set(EXECUTABLE_NAME "GranularSynth")
 set(BUNDLE_VERSION "1.0.0")
 set(BUNDLE_SHORT_VERSION "1.0")
-set(MINIMUM_SYSTEM_VERSION "12.7")
+set(MINIMUM_SYSTEM_VERSION "12.0")
 set(COPYRIGHT "© 2025 Cuervo Blanco")
 set(ICON_FILE "")
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0")
+set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Core)
 
 find_library(RUST_LIB NAMES libbackend.a PATHS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../backend/target/release
+    ${CMAKE_CURRENT_SOURCE_DIR}/../backend/target/universal/release
     REQUIRED) 
 if(NOT RUST_LIB)
     message(FATAL_ERROR "Rust library not found!")
