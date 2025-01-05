@@ -30,20 +30,30 @@ jobs:
 
       - name: Install Dependencies
         run: |
+
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
           brew install cmake
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable-x86_64-apple-darwin
           source "$HOME/.cargo/env"
+
           echo 'export PATH="~/.cargo/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
+
+          rustup install stable-x86_64-apple-darwin -y
+          rustup default stable-x86_64-apple-darwin -y
+
+          echo "QT_INSTALL_PATH: $QT_INSTALL_PATH"
+          if [ -z "$QT_INSTALL_PATH" ]; then
+            echo "Error: QT_INSTALL_PATH is not set or invalid."
+            exit 1
+          fi
+
           mkdir ~/Qt
           curl -L -O $QT_INSTALL_PATH
           hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
           /Volumes/qt-online-installer-macOS-x64-4.8.1/qt-online-installer-macOS-x64-4.8.1.app/Contents/MacOS/qt-online-installer-macOS-x64-4.8.1 install -t ~/Qt -m "$QT_EMAIL" --pw "$QT_PASSWORD" --accept-licenses —accept-obligations --default-answer --auto-answer telemetry-question=No,AssociateCommonFiletypes=No --confirm-command --verbose
-          rustup-init -y
-          rustup install stable -y
-          rustup default stable -y
 
       - name: Build Rust Backend (Intel)
         run: |
