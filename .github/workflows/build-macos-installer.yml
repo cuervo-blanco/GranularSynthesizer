@@ -11,7 +11,7 @@ on:
       - main
 
 jobs:
-  build-macos:
+  build-intel:
     runs-on: macos-latest
     permissions:
       contents: write
@@ -24,58 +24,88 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Rosetta
-        run: softwareupdate --install-rosetta --agree-to-license
-
-      - name: Install x86_64 Homebrew
+      - name: Install Intel Dependencies
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-      - name: Switch to x86_64 Homebrew
-        run: |
           eval "$(/usr/local/bin/brew shellenv)"
-          brew install qt cmake
-
-
-      - name: Install ARM Homebrew Dependencies
-        run: |
-          eval "$(/opt/homebrew/bin/brew shellenv)"
-          brew install cmake rustup-init
+          brew install qt cmake rustup-init
           rustup-init -y
           rustup install stable
           rustup default stable
-          rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
-      - name: Build Rust Backend
+      - name: Build Rust Backend (Intel)
         run: |
           cd $BACKEND_DIR
           cargo build --release --target=x86_64-apple-darwin
-          cargo build --release --target=aarch64-apple-darwin
-          mkdir -p target/universal/release
-          lipo -create \
-              target/x86_64-apple-darwin/release/libbackend.a \
-              target/aarch64-apple-darwin/release/libbackend.a \
-              -output target/universal/release/libbackend.a
 
-      - name: Build C++ frontend
+      - name: Build C++ Frontend (Intel)
         run: |
           eval "$(/usr/local/bin/brew shellenv)"
-          mkdir -p frontend/build
+          mkdir -p $FRONTEND_DIR
           cd $FRONTEND_DIR
-          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
+          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) -DCMAKE_OSX_ARCHITECTURES="x86_64" ..
           cmake --build . --config Release
 
-      - name: Bundle .app with macdeployqt
+      - name: Bundle .app with macdeployqt (Intel)
         run: |
           eval "$(/usr/local/bin/brew shellenv)"
           macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app
 
-      - name: Create .dmg file
+      - name: Upload Intel .dmg to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: $FRONTEND_DIR/GranularSynth-Intel.dmg
+          asset_name: GranularSynth-Intel.dmg
+          asset_content_type: application/octet-stream
+
+  build-arm:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    env:
+      BACKEND_DIR: backend
+      FRONTEND_DIR: frontend/build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install ARM Dependencies
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          brew install qt cmake rustup-init
+          rustup-init -y
+          rustup install stable
+          rustup default stable
+
+      - name: Build Rust Backend (ARM)
+        run: |
+          cd $BACKEND_DIR
+          cargo build --release --target=aarch64-apple-darwin
+
+      - name: Build C++ Frontend (ARM)
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          mkdir -p $FRONTEND_DIR
+          cd $FRONTEND_DIR
+          cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) -DCMAKE_OSX_ARCHITECTURES="arm64" ..
+          cmake --build . --config Release
+
+      - name: Bundle .app with macdeployqt (ARM)
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app
+
+      - name: Create ARM .dmg
         run: |
           hdiutil create -volname GranularSynth \
                          -srcfolder $FRONTEND_DIR/Bundles/GranularSynth.app \
                          -ov -format UDZO \
-                         $FRONTEND_DIR/GranularSynth.dmg
+                         $FRONTEND_DIR/GranularSynth-ARM.dmg
 
       - name: Create GitHub Release
         id: create_release
@@ -89,13 +119,12 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
-        id: upload-release-asset 
+      - name: Upload ARM .dmg to Release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: frontend/build/GranularSynth.dmg
-          asset_name: GranularSynth.dmg
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: $FRONTEND_DIR/GranularSynth-ARM.dmg
+          asset_name: GranularSynth-ARM.dmg
           asset_content_type: application/octet-stream
