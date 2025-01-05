@@ -33,6 +33,8 @@ jobs:
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
           brew install cmake rustup-init
+          echo 'export PATH="/usr/local/opt/rustup/bin:$PATH"' >> ~/.bash_profile
+          source ~/.bash_profile
           mkdir ~/Qt
           curl -L -O $QT_INSTALL_PATH
           hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
