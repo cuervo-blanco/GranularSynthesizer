@@ -31,8 +31,9 @@ jobs:
           rustup default stable
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
 
-      - name: Run installation script
+      - name: Build Rust Backend
         run: |
+          cd backend
           cargo build --release --target=x86_64-apple-darwin
           cargo build --release --target=aarch64-apple-darwin
           mkdir -p backend/target/universal/release
@@ -43,6 +44,7 @@ jobs:
 
       - name: Build C++ frontend
         run: |
+          cd ..
           mkdir -p frontend/build
           cd frontend/build
           cmake -DCMAKE_PREFIX_PATH=$(brew --prefix qt) ..
