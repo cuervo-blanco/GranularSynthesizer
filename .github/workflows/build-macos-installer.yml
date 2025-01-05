@@ -35,7 +35,7 @@ jobs:
           brew install cmake
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
-          echo 'export PATH="~/.cargo/rustup/bin:$PATH"' >> ~/.bash_profile
+          echo 'export PATH="~/.cargo/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
           mkdir ~/Qt
           curl -L -O $QT_INSTALL_PATH
