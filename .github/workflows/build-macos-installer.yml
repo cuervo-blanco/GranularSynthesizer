@@ -33,8 +33,8 @@ jobs:
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
 
-          brew link --overwrite python
-          brew install python cmake rust
+          brew install python@3.13 cmake rust
+          brew link --overwrite python@3.13
 
           python3 --version
           rustc --version
