@@ -29,42 +29,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Rust toolchain with target
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy, rustfmt
-          targets: x86_64-apple-darwin
-      - name: Verify Rust Targets
+      - name: Install Rosetta
         run: |
-          rustup target list --installed
+          softwareupdate --install-rosetta --agree-to-license
 
-      - name: Install Dependencies
+      - name: Install x86_64 Homebrew + Dependencies
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
           rm -f /usr/local/bin/idle3 /usr/local/bin/idle3.13 /usr/local/bin/pydoc3 /usr/local/bin/pydoc3.13 \
-                /usr/local/bin/python3 /usr/local/bin/python3-config /usr/local/bin/python3.13 \
-                /usr/local/bin/python3.13-config
-
-          brew install --formula cmake
-
-          python3 --version
-          cargo --version
-
+          /usr/local/bin/python3 /usr/local/bin/python3-config /usr/local/bin/python3.13 \
+          /usr/local/bin/python3.13-config
+          brew install cmake
           echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
 
+      - name: Set up Rust toolchain for x86_64
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable-x86_64-apple-darwin
+          targets: x86_64-apple-darwin
+          components: clippy, rustfmt
+
+      - name: Build Rust for x86_64
+        run: |
+          cd $BACKEND_DIR
+          arch -x86_64 cargo build --release --target x86_64-apple-darwin
+
+      - name: Install Qt x86_64
+        run: |
           echo "QT_INSTALL_PATH: $QT_INSTALL_PATH"
           if [ -z "$QT_INSTALL_PATH" ]; then
             echo "Error: QT_INSTALL_PATH is not set or invalid."
             exit 1
           fi
-
           mkdir ~/Qt
-          curl -L -O $QT_INSTALL_PATH
-          hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
-          /Volumes/qt-online-installer-macOS-x64-4.8.1/qt-online-installer-macOS-x64-4.8.1.app/Contents/MacOS/qt-online-installer-macOS-x64-4.8.1 install \
+          arch -x86_64 curl -L -O $QT_INSTALL_PATH
+          arch -x86_64 hdiutil attach qt-online-installer-macOS-x64-4.8.1.dmg 
+          arch -x86_64 /Volumes/qt-online-installer-macOS-x64-4.8.1/qt-online-installer-macOS-x64-4.8.1.app/Contents/MacOS/qt-online-installer-macOS-x64-4.8.1 install \
             -t ~/Qt \
             -m "$QT_EMAIL" \
             --pw "$QT_PASSWORD" \
@@ -75,22 +77,17 @@ jobs:
             --confirm-command \
             --verbose \
 
-      - name: Build Rust Backend (Intel)
-        run: |
-          cd $BACKEND_DIR
-          cargo build --release --target=x86_64-apple-darwin
-
       - name: Build C++ Frontend (Intel)
         run: |
           eval "$(/usr/local/bin/brew shellenv)"
           mkdir -p $FRONTEND_DIR
-          cmake -B $FRONTEND_DIR -S . -DQT_PATH=$QT_PATH
-          cmake --build $FRONTEND_DIR/build
+          arch -x86_64 cmake -B $FRONTEND_DIR -S . -DQT_PATH=$QT_PATH
+          arch -x86_64 cmake --build $FRONTEND_DIR/build
 
       - name: Bundle .app with macdeployqt (Intel)
         run: |
           eval "$(/usr/local/bin/brew shellenv)"
-          macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app -dmg
+          arch -x86_64 ~/Qt/6.8.1/macos/bin/macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app -dmg
 
       - name: Create GitHub Release
         id: create_release
