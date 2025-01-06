@@ -35,25 +35,16 @@ jobs:
           toolchain: stable
           components: clippy, rustfmt
           targets: x86_64-apple-darwin
-      - name: Install Rust via rustup
-        run: |
-          curl https://sh.rustup.rs -sSf | sh -s -- -y
-          echo "::add-path::$HOME/.cargo/bin"
 
       - name: Install Dependencies
         run: |
           arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           eval "$(/usr/local/bin/brew shellenv)"
-          rm -f /usr/local/bin/idle3
-          rm -f /usr/local/bin/idle3.13
-          rm -f /usr/local/bin/pydoc3
-          rm -f /usr/local/bin/pydoc3.13
-          rm -f /usr/local/bin/python3
-          rm -f /usr/local/bin/python3-config
-          rm -f /usr/local/bin/python3.13
-          rm -f /usr/local/bin/python3.13-config
+          rm -f /usr/local/bin/idle3 /usr/local/bin/idle3.13 /usr/local/bin/pydoc3 /usr/local/bin/pydoc3.13 \
+                /usr/local/bin/python3 /usr/local/bin/python3-config /usr/local/bin/python3.13 \
+                /usr/local/bin/python3.13-config
 
-          brew install --formula cmake
+          brew install --formula cmake rust
 
           python3 --version
           rustc --version
