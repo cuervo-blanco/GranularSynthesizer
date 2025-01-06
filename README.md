@@ -8,7 +8,7 @@ processing, to a high-level user interface, and finalizing in a environment
 setup complete for installation and run.
 
 A ready made compiled .dmg is found in the [Bundle
-directory](https://github.com/cuervo-blanco/GranularSynthesizer/frontend/build/Bundles/GranularSynthesizer.dmg)
+directory](https://github.com/cuervo-blanco/GranularSynthesizer/tree/main/dmg)
 
 The Synthesizer is built with a two-part structure:
 - **Backend**: Developed in Rust, handling audio synthesis and real-time processing.
