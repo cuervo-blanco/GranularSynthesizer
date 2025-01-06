@@ -1,4 +1,15 @@
 # GranularSynth
+Firstly I apologize, half of my commit history at the moment is Git Actions and
+creating a CI/CD development environment. I will be including a ready made .dmg
+file, but this one is not guaranteed to work in your environment from the
+get-go. This is a noob job I admit, but it is the most complex I have developed
+at the moment, including stages from dsp development, through sample-by-sample
+processing, to a high-level user interface, and finalizing in a environment
+setup complete for installation and run.
+
+A ready made compiled .dmg is found in the [Bundle
+directory](https://github.com/cuervo-blanco/GranularSynthesizer/frontend/build/Bundles/GranularSynthesizer.dmg)
+
 The Synthesizer is built with a two-part structure:
 - **Backend**: Developed in Rust, handling audio synthesis and real-time processing.
 - **Frontend**: Written in C++ (Qt framework), providing an interactive graphical interface.
