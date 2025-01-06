@@ -35,6 +35,9 @@ jobs:
           toolchain: stable
           components: clippy, rustfmt
           targets: x86_64-apple-darwin
+      - name: Verify Rust Targets
+        run: |
+          rustup target list --installed
 
       - name: Install Dependencies
         run: |
@@ -44,10 +47,9 @@ jobs:
                 /usr/local/bin/python3 /usr/local/bin/python3-config /usr/local/bin/python3.13 \
                 /usr/local/bin/python3.13-config
 
-          brew install --formula cmake rust
+          brew install --formula cmake
 
           python3 --version
-          rustc --version
           cargo --version
 
           echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bash_profile
