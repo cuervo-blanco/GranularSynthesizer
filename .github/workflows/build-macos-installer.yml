@@ -29,38 +29,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Rosetta
+      - name: Install Homebrew Dependencies
         run: |
-          softwareupdate --install-rosetta --agree-to-license
-
-      - name: Install x86_64 Homebrew + Dependencies
-        run: |
-          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          eval "$(/usr/local/bin/brew shellenv)"
-          rm -f /usr/local/bin/idle3 /usr/local/bin/idle3.13 /usr/local/bin/pydoc3 /usr/local/bin/pydoc3.13 \
-          /usr/local/bin/python3 /usr/local/bin/python3-config /usr/local/bin/python3.13 \
-          /usr/local/bin/python3.13-config
+          # On Apple Silicon runners, brew usually lives in /opt/homebrew
+          # The official install command can auto-detect arch, but we can do:
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          
+          echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          
           brew install cmake
-          echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bash_profile
-          source ~/.bash_profile
 
-      - name: Force-install x86_64 Rust under Rosetta
+      - name: Set up Rust toolchain (arm64)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # This ensures the toolchain is Apple Silicon–only
+          toolchain: stable-aarch64-apple-darwin
+          targets: aarch64-apple-darwin
+          components: clippy, rustfmt
+
+      - name: Build Rust (Apple Silicon)
         run: |
-          arch -x86_64 curl -sSfL \
-            -o rustup-init \
-            https://static.rust-lang.org/rustup/dist/x86_64-apple-darwin/rustup-init
-          arch -x86_64 chmod +x rustup-init
-          arch -x86_64 ./rustup-init -y --default-toolchain stable-x86_64-apple-darwin
-          . "$HOME/.cargo/env"
-          arch -x86_64 rustup target add x86_64-apple-darwin
-          arch -x86_64 rustup component add clippy rustfmt
-
-
-      - name: Build Rust
-        run: |
-          source $HOME/.cargo/env
-          cd backend
-          arch -x86_64 cargo build --release --target x86_64-apple-darwin
+          cd $BACKEND_DIR
+          cargo build --release --target=aarch64-apple-darwin
 
       - name: Install Qt x86_64
         run: |
@@ -83,17 +74,20 @@ jobs:
             --confirm-command \
             --verbose \
 
-      - name: Build C++ Frontend (Intel)
+      - name: Build C++ Frontend (Apple Silicon)
         run: |
-          eval "$(/usr/local/bin/brew shellenv)"
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          
           mkdir -p $FRONTEND_DIR
-          arch -x86_64 cmake -B $FRONTEND_DIR -S . -DQT_PATH=$QT_PATH
-          arch -x86_64 cmake --build $FRONTEND_DIR/build
+          cmake -B $FRONTEND_DIR -S . -DQT_PATH="$QT_PATH"
+          cmake --build $FRONTEND_DIR/build
 
-      - name: Bundle .app with macdeployqt (Intel)
+      - name: Bundle .app into .dmg
         run: |
-          eval "$(/usr/local/bin/brew shellenv)"
-          arch -x86_64 ~/Qt/6.8.1/macos/bin/macdeployqt $FRONTEND_DIR/Bundles/GranularSynth.app -dmg
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          ~/Qt/6.8.1/macos/bin/macdeployqt "$FRONTEND_DIR/Bundles/GranularSynth.app" -dmg
+          
+          mv "$FRONTEND_DIR/Bundles/GranularSynth.dmg" "$FRONTEND_DIR/GranularSynth-ARM64.dmg"
 
       - name: Create GitHub Release
         id: create_release
