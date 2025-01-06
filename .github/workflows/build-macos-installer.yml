@@ -44,16 +44,21 @@ jobs:
           echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bash_profile
           source ~/.bash_profile
 
-      - name: Set up Rust toolchain for x86_64
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable-x86_64-apple-darwin
-          targets: x86_64-apple-darwin
-          components: clippy, rustfmt
-
-      - name: Build Rust for x86_64
+      - name: Manually install x86_64 Rust
         run: |
-          cd $BACKEND_DIR
+          # Force the installer to run under Rosetta
+          arch -x86_64 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | arch -x86_64 bash -s -- -y \
+            --default-toolchain stable-x86_64-apple-darwin
+          # Load cargo into this shell session
+          source $HOME/.cargo/env
+          # Ensure correct target is installed
+          arch -x86_64 rustup target add x86_64-apple-darwin
+          arch -x86_64 rustup component add clippy rustfmt
+
+      - name: Build Rust
+        run: |
+          source $HOME/.cargo/env
+          cd backend
           arch -x86_64 cargo build --release --target x86_64-apple-darwin
 
       - name: Install Qt x86_64
