@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: write
 
+
     env:
       BACKEND_DIR: backend
       FRONTEND_DIR: frontend/build
@@ -27,6 +28,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Install Rust using rustup
+        uses: actions/setup-rust@v1
+        with:
+          rustup-components: "rustfmt,clippy"
+          toolchain: stable
+
+      - name: Add x86_64-apple-darwin target
+        run: rustup target add x86_64-apple-darwin
 
       - name: Install Dependencies
         run: |
